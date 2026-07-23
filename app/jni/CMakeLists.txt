@@ -29,13 +29,11 @@ set(ENABLE_TGVOIP yes)
 #endif()
 set(USE_WEBP yes)
 
-if (${ANDROID_ABI} STREQUAL "x86_64" OR ${ANDROID_ABI} STREQUAL "arm64-v8a")
+if (${ANDROID_ABI} STREQUAL "arm64-v8a")
   set(FFMPEG_ABI ${ANDROID_ABI})
   if (${TGX_FLAVOR} MATCHES "legacy")
     message(FATAL_ERROR "Invalid combination: ${TGX_FLAVOR} ${ANDROID_ABI}")
   endif()
-elseif(${ANDROID_ABI} STREQUAL "x86")
-  set(FFMPEG_ABI "i686")
 elseif(${ANDROID_ABI} STREQUAL "armeabi-v7a")
   set(FFMPEG_ABI "armv7-a")
 else()
@@ -56,24 +54,15 @@ set(VPX_DIR "${THIRDPARTY_DIR}/libvpx/build/${TGX_FLAVOR}/${FFMPEG_ABI}")
 set(VPX_LIB_PATH "${VPX_DIR}/lib/libvpx.a")
 
 # == Constants ==
-# $IS_ARM_FAMILY – armeabi-v7a or arm64-v8a
 
-if (${ANDROID_ABI} STREQUAL "armeabi-v7a" OR ${ANDROID_ABI} STREQUAL "arm64-v8a")
-  set(IS_ARM_FAMILY yes)
-else()
-  set(IS_ARM_FAMILY no)
-endif()
+set(IS_ARM_FAMILY yes)
 
 # == CMake global settings ==
 
 set(CMAKE_SKIP_RPATH ON)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
 
-if (${IS_ARM_FAMILY})
-  enable_language(ASM)
-else()
-  enable_language(ASM_NASM)
-endif()
+enable_language(ASM)
 set(ORIGINAL_CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS}")
 
 set(EXCLUDE_LIBS
@@ -274,7 +263,7 @@ target_link_libraries(${NATIVE_LIB}
   cpufeatures
 )
 
-if (${ANDROID_ABI} STREQUAL "arm64-v8a" OR ${ANDROID_ABI} STREQUAL "x86_64")
+if (${ANDROID_ABI} STREQUAL "arm64-v8a")
   # Enable 16 KB ELF alignment.
   target_link_options(${NATIVE_LIB} PRIVATE
     "-Wl,-z,max-page-size=16384"

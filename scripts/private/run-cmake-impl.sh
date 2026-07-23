@@ -40,9 +40,7 @@ test -d build || mkdir build
 pushd build > /dev/null
 
 run_cmake arm64-v8a 21
-run_cmake x86_64 21
 run_cmake armeabi-v7a 16
-run_cmake x86 16
 
 popd > /dev/null
 popd

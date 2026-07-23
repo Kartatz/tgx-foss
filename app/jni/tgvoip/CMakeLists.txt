@@ -170,14 +170,6 @@ elseif(${ANDROID_ABI} STREQUAL "arm64-v8a")
     WEBRTC_ARCH_ARM64
     WEBRTC_HAS_NEON
   )
-elseif(${ANDROID_ABI} STREQUAL "x86")
-  target_compile_definitions(${TGCALLS_LIB} PUBLIC
-    HAVE_SSE2
-  )
-elseif(${ANDROID_ABI} STREQUAL "x86_64")
-  target_compile_definitions(${TGCALLS_LIB} PUBLIC
-    HAVE_SSE2
-  )
 endif()
 
 target_link_libraries(${TGCALLS_LIB}
@@ -214,7 +206,7 @@ target_link_options(${TGCALLS_LIB} PUBLIC
   -Wl,--exclude-libs,${TGCALLS_EXCLUDE_LIBS}
 )
 
-if (${ANDROID_ABI} STREQUAL "arm64-v8a" OR ${ANDROID_ABI} STREQUAL "x86_64")
+if (${ANDROID_ABI} STREQUAL "arm64-v8a")
   # Enable 16 KB ELF alignment.
   target_link_options(${TGCALLS_LIB} PRIVATE
     "-Wl,-z,max-page-size=16384"

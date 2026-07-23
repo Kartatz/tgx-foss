@@ -79,26 +79,6 @@ configure_abi() {
       ASFLAGS=""
       CPU=armv7-a
     ;;
-    x86_64)
-      ANDROID_NDK_VERSION=$ANDROID_NDK_VERSION_PRIMARY
-      TARGET="x86_64-android-gcc"
-      NDK_ABIARCH="x86_64-linux-android"
-      CFLAGS="${CFLAGS_} -O3 -march=x86-64 -msse4.2 -mpopcnt -m64 -fPIC"
-      LDFLAGS=""
-      ASFLAGS="-D__ANDROID__"
-      CPU=x86_64
-      EXTRA_PARAMS=( )
-    ;;
-    x86)
-      ANDROID_NDK_VERSION=$ANDROID_NDK_VERSION_LEGACY
-      TARGET="x86-android-gcc"
-      NDK_ABIARCH="i686-linux-android"
-      CFLAGS="${CFLAGS_} -O3 -march=i686 -msse3 -mfpmath=sse -m32 -fPIC"
-      LDFLAGS="-m32"
-      ASFLAGS="-D__ANDROID__"
-      CPU=i686
-      EXTRA_PARAMS=( )
-    ;;
     *)
       echo "Unknown abi: ${ABI}" >&2
       exit 1
@@ -154,19 +134,13 @@ configure_make() {
 
   make clean || echo -e "[info] running configure for the first time"
 
-  if [[ $ABI == "arm64-v8a" || $ABI == "armeabi-v7a" ]]; then
-    CPU_DETECT="--enable-runtime-cpu-detect"
-  else
-    CPU_DETECT="--disable-runtime-cpu-detect"
-  fi
-
   ./configure \
     --libc="${SYSROOT}" \
     --prefix="${PREFIX}" \
     --target="${TARGET}" \
     "${EXTRA_PARAMS[@]}" \
-    ${CPU_DETECT} \
     --as=auto \
+    --enable-runtime-cpu-detect \
     --disable-docs \
     --enable-pic \
     --enable-libyuv \
@@ -186,9 +160,9 @@ configure_make() {
   make -j"$CPU_COUNT" install
 }
 
-for ABI in arm64-v8a armeabi-v7a x86_64 x86 ; do
+for ABI in arm64-v8a armeabi-v7a ; do
   for FLAVOR in $FLAVORS; do
-    if [[ "$FLAVOR" != "legacy" || $ABI == "armeabi-v7a" || $ABI == "x86" ]]; then
+    if [[ "$FLAVOR" != "legacy" || $ABI == "armeabi-v7a" ]]; then
       echo -e "${STYLE_INFO}- libvpx build start: ${ABI} ${FLAVOR}${STYLE_END}"
       configure_make "$FLAVOR" "$ABI"
       echo -e "${STYLE_INFO}- libvpx build finish: ${ABI} ${FLAVOR}${STYLE_END}"
