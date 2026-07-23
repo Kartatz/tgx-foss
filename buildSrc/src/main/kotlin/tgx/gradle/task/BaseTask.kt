@@ -40,6 +40,6 @@ abstract class BaseTask : DefaultTask() {
     return properties.getProperty(key, null) ?: sampleProperties.getOrThrow(key)
   }
 
-  fun applicationId (): String = propertyOrSample("app.id")
-  fun applicationName (): String = propertyOrSample("app.name")
+  fun applicationId (): String = "com.amanoteam.vulcanus"
+  fun applicationName (): String = "Goregram X"
 }

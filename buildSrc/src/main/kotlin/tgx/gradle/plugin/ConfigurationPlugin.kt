@@ -29,8 +29,8 @@ open class ConfigurationPlugin : Plugin<Project> {
     fun getOrSample (key: String): String {
       return properties.getProperty(key, null) ?: sampleProperties.getOrThrow(key)
     }
-    val applicationId = getOrSample("app.id")
-    val applicationName = getOrSample("app.name")
+    val applicationId = "com.amanoteam.vulcanus"
+    val applicationName = "Goregram X"
     val appDownloadUrl = getOrSample("app.download_url")
     val googlePlayUrl = properties.getProperty("app.google_download_url", null)
     val galaxyStoreUrl = properties.getProperty("app.galaxy_download_url", null)
