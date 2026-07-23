@@ -2,7 +2,6 @@
 
 set(RLOTTIE_DIR "${THIRDPARTY_DIR}/rlottie")
 
-# TODO: move to "${THIRDPARTY_DIR}/rlottie"
 add_library(rlottie STATIC
   "${RLOTTIE_DIR}/src/lottie/lottieanimation.cpp"
   "${RLOTTIE_DIR}/src/lottie/lottieitem.cpp"
@@ -53,18 +52,12 @@ target_include_directories(rlottie PUBLIC
   "${RLOTTIE_DIR}/src/vector/stb")
 
 if (${ANDROID_ABI} STREQUAL "armeabi-v7a")
-  target_compile_options(rlottie PUBLIC
-    -fno-integrated-as
-  )
   target_compile_definitions(rlottie PRIVATE
     USE_ARM_NEON
   )
   target_sources(rlottie PRIVATE
     "${RLOTTIE_DIR}/src/vector/pixman/pixman-arm-neon-asm.S")
 elseif(${ANDROID_ABI} STREQUAL "arm64-v8a")
-  target_compile_options(rlottie PUBLIC
-    -fno-integrated-as
-  )
   target_compile_definitions(rlottie PRIVATE
     USE_ARM_NEON
     __ARM64_NEON__

@@ -33,3 +33,5 @@ for module in "${remote_modules[@]}"; do
   git pull origin "$version" || (echo "Pulling $module $version failed" && exit 1)
   popd > /dev/null
 done
+
+patch-rlottie-and-opusfile-impl.sh

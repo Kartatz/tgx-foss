@@ -27,6 +27,8 @@ patch-opus-impl.sh
 # Patch androidx-media sources
 patch-androidx-media-impl.sh
 
+patch-rlottie-and-opusfile-impl.sh
+
 # Build and configure libvpx
 build-vpx-impl.sh
 

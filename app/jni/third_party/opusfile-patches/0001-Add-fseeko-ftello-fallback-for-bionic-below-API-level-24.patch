@@ -1,0 +1,39 @@
+From aa2136a7c8b18c9e8d3db040bf5a50b7122e5498 Mon Sep 17 00:00:00 2001
+From: Kartatz <105828205+Kartatz@users.noreply.github.com>
+Date: Thu, 23 Jul 2026 17:30:32 +0000
+Subject: [PATCH] Add fseeko()/ftello() fallback for bionic below API level 24
+
+bionic only declares fseeko()/ftello() from API level 24, but our minimum
+supported level is 21. Replace the fseeko()/ftello() calls with fseek()/ftell()
+when __ANDROID_API__ < 24 so opusfile builds against the current NDK floor.
+---
+ src/stream.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/stream.c b/src/stream.c
+index 6559e1d..fe7d53d 100644
+--- a/src/stream.c
++++ b/src/stream.c
+@@ -96,6 +96,9 @@ static int op_fseek(void *_stream,opus_int64 _offset,int _whence){
+   if(pos<0||_offset<-pos||_offset>OP_INT64_MAX-pos)return -1;
+   pos+=_offset;
+   return fsetpos((FILE *)_stream,(fpos_t *)&pos);
++#elif defined(__ANDROID__) && __ANDROID_API__ < 24
++  /*fseeko() is not available in bionic until API level 24.*/
++  return fseek((FILE *)_stream,(long)_offset,_whence);
+ #else
+   /*This function actually conforms to the SUSv2 and POSIX.1-2001, so we prefer
+      it except on Windows.*/
+@@ -111,6 +114,9 @@ static opus_int64 op_ftell(void *_stream){
+   opus_int64 pos;
+   OP_ASSERT(sizeof(pos)==sizeof(fpos_t));
+   return fgetpos((FILE *)_stream,(fpos_t *)&pos)?-1:pos;
++#elif defined(__ANDROID__) && __ANDROID_API__ < 24
++  /*ftello() is not available in bionic until API level 24.*/
++  return ftell((FILE *)_stream);
+ #else
+   /*This function actually conforms to the SUSv2 and POSIX.1-2001, so we prefer
+      it except on Windows.*/
+-- 
+2.54.0
+
