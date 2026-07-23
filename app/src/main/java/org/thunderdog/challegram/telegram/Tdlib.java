@@ -37,15 +37,6 @@ import androidx.collection.SparseArrayCompat;
 import androidx.core.os.CancellationSignal;
 import androidx.core.util.Pair;
 
-import com.google.android.gms.tasks.Task;
-import com.google.android.play.core.integrity.IntegrityManager;
-import com.google.android.play.core.integrity.IntegrityManagerFactory;
-import com.google.android.play.core.integrity.IntegrityTokenRequest;
-import com.google.android.play.core.integrity.IntegrityTokenResponse;
-import com.google.android.recaptcha.RecaptchaAction;
-import com.google.android.recaptcha.RecaptchaTasksClient;
-import com.google.firebase.FirebaseOptions;
-
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 import org.drinkmore.Tracer;
@@ -132,7 +123,6 @@ import me.vkryl.core.lambda.RunnableData;
 import me.vkryl.core.lambda.RunnableInt;
 import me.vkryl.core.lambda.RunnableLong;
 import me.vkryl.core.util.ConditionalExecutor;
-import tgx.app.RecaptchaProviderRegistry;
 import tgx.td.ChatId;
 import tgx.td.ChatPosition;
 import tgx.td.JSON;
@@ -5971,8 +5961,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
   }
 
   public String safetyNetApiKey () {
-    // TODO: server config
-    return BuildConfig.SAFETYNET_API_KEY;
+    return "";
   }
 
   public TdApi.PhoneNumberAuthenticationSettings phoneNumberAuthenticationSettings (Context context) {
@@ -6071,7 +6060,7 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
       params.put("data", fingerprint);
     }
     params.put("tz_offset", timeZoneOffset);
-    params.put("recaptcha", BuildConfig.RECAPTCHA_VERSION);
+    params.put("recaptcha", "0");
 
     Map<String, Object> git = new LinkedHashMap<>();
     git.put("remote", BuildConfig.REMOTE_URL.replaceAll("^(https?://)?github\\.com/", ""));
@@ -9158,107 +9147,16 @@ public class Tdlib implements TdlibProvider, Settings.SettingsChangeListener, Da
     public ApplicationVerificationException (@NonNull String message, Throwable cause) {
       super(message, cause);
     }
-
-    public static String formatPlayIntegrityMessage (Exception e) {
-      if (e == null) return "NULL";
-      String str = "";
-      if (e.getClass() != null && e.getClass().getSimpleName() != null) {
-        str = e.getClass().getSimpleName();
-        if (str == null) str = "";
-      }
-      if (e.getMessage() != null) {
-        if (str.length() > 0) str += " ";
-        str += e.getMessage();
-      }
-      return str.toUpperCase().replaceAll(" ", "_");
-    }
-
-    public static String formatReCaptchaMessage (Exception e) {
-      if (e == null) return "NULL";
-      if (e.getMessage() == null) return "MSG_NULL";
-      return e.getMessage().replaceAll(" ", "_").toUpperCase();
-    }
   }
 
   public void requestPlayIntegrity (long verificationId, String nonce, ApplicationVerificationCallback callback) {
-    TDLib.Tag.playIntegrity("Received Play Integrity request verificationId=%d", verificationId);
-    RunnableData<Exception> onError = e -> {
-      TDLib.Tag.playIntegrity("failure verificationId=%d: %s", verificationId, Log.toString(e));
-      final String error;
-      if (e instanceof ApplicationVerificationException) {
-        error = e.getMessage();
-      } else {
-        error = "PLAYINTEGRITY_FAILED_EXCEPTION_" + ApplicationVerificationException.formatPlayIntegrityMessage(e);
-      }
-      callback.onApplicationVerificationResult(error);
-    };
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-      onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_SDK_TOO_LOW_" + Build.VERSION.SDK_INT));
-      return;
-    }
-    long projectId = 0;
-    try {
-      FirebaseOptions options = FirebaseOptions.fromResource(UI.getAppContext());
-      String projectIdRaw = options != null ? options.getGcmSenderId() : "";
-      if (!StringUtils.isEmpty(projectIdRaw)) {
-        projectId = Long.parseLong(projectIdRaw);
-      } else {
-        throw new IllegalStateException();
-      }
-    } catch (Exception e) {
-      onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_EXCEPTION_NOPROJECT"));
-      return;
-    }
-    try {
-      IntegrityTokenRequest request = IntegrityTokenRequest.builder()
-        .setNonce(nonce)
-        .setCloudProjectNumber(projectId)
-        .build();
-      IntegrityManager integrityManager = IntegrityManagerFactory.create(UI.getAppContext());
-      Task<IntegrityTokenResponse> integrityTokenResponse = integrityManager.requestIntegrityToken(request);
-      integrityTokenResponse
-        .addOnSuccessListener(r -> {
-          final String token = r.token();
-          if (token != null) {
-            TDLib.Tag.playIntegrity("success verificationId=%d: %s", verificationId, token);
-            callback.onApplicationVerificationResult(token);
-          } else {
-            onError.runWithData(new ApplicationVerificationException("PLAYINTEGRITY_FAILED_EXCEPTION_NULL"));
-          }
-        })
-        .addOnFailureListener(onError::runWithData);
-    } catch (Exception e) {
-      onError.runWithData(e);
-    }
+    TDLib.Tag.playIntegrity("Ignoring Play Integrity request verificationId=%d: feature disabled.", verificationId);
+    callback.onApplicationVerificationResult("PLAYINTEGRITY_DISABLED");
   }
 
   public void requestRecaptcha (long verificationId, String action, String recaptchaKeyId, ApplicationVerificationCallback callback) {
-    TDLib.Tag.recaptcha("Received ReCaptcha request verificationId=%d action=%s", verificationId, action);
-    RunnableData<ApplicationVerificationException> onError = e -> {
-      TDLib.Tag.recaptcha("failure verificationId=%d: %s", verificationId, Log.toString(e));
-      callback.onApplicationVerificationResult(e.getMessage());
-    };
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
-      onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_SDK_TOO_LOW_" + Build.VERSION.SDK_INT));
-      return;
-    }
-    RunnableData<RecaptchaTasksClient> actor = client -> {
-      client.executeTask(RecaptchaAction.custom(action))
-        .addOnSuccessListener(token -> {
-          if (token != null) {
-            TDLib.Tag.recaptcha("success verificationId=%d", verificationId);
-            callback.onApplicationVerificationResult(token);
-          } else {
-            onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_TOKEN_NULL"));
-          }
-        })
-        .addOnFailureListener(taskError ->
-          onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_TASK_EXCEPTION_" + ApplicationVerificationException.formatReCaptchaMessage(taskError), taskError))
-        );
-    };
-    RecaptchaProviderRegistry.execute(recaptchaKeyId, actor, clientError ->
-      onError.runWithData(new ApplicationVerificationException("RECAPTCHA_FAILED_GETCLIENT_EXCEPTION_" + ApplicationVerificationException.formatReCaptchaMessage(clientError), clientError))
-    );
+    TDLib.Tag.recaptcha("Ignoring reCAPTCHA request verificationId=%d action=%s: feature disabled.", verificationId, action);
+    callback.onApplicationVerificationResult("RECAPTCHA_DISABLED");
   }
 
   private TdApi.AgeVerificationParameters ageVerificationParameters;
