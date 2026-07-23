@@ -292,6 +292,7 @@ android {
         Sdk.VARIANTS.forEach { (subSdkIndex, subVariant) ->
           buildConfigBool("${subVariant.flavor.uppercase()}_FLAVOR", sdkIndex == subSdkIndex)
         }
+        buildConfigBool("LATEST_FLAVOR", sdkIndex == Sdk.LATEST)
 
         var extraProguardFileCount = 0
 
