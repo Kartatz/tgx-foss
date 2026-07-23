@@ -21,39 +21,12 @@ import tgx.gradle.fatal
 import tgx.gradle.getIntOrThrow
 import tgx.gradle.getOrThrow
 import tgx.gradle.loadProperties
-import java.io.File
-
-class Keystore (configPath: String) {
-  val file: File
-  val password: String
-  val keyAlias: String
-  val keyPassword: String
-
-  init {
-    val config = loadProperties(configPath)
-    this.file = File(config.getOrThrow("keystore.file"))
-    this.password = config.getOrThrow("keystore.password")
-    this.keyAlias = config.getOrThrow("key.alias")
-    this.keyPassword = config.getOrThrow("key.password")
-  }
-}
 
 open class ConfigurationPlugin : Plugin<Project> {
   override fun apply(project: Project) {
     val properties = loadProperties()
     val sampleProperties = loadProperties("local.properties.sample")
-    val keystoreFilePath = properties.getProperty("keystore.file", "")
-    val disableSigning = properties.getProperty("app.disable_signing", "false") == "true"
-    val keystore = if (keystoreFilePath.isNotEmpty() && !disableSigning) {
-      Keystore(keystoreFilePath)
-    } else {
-      null
-    }
-    val safetyNetToken = if (keystore != null) {
-      properties.getProperty("safetynet.api_key", "")
-    } else {
-      null
-    }
+    val safetyNetToken = properties.getProperty("safetynet.api_key", "")
     fun getOrSample (key: String): String {
       return properties.getProperty(key, null) ?: sampleProperties.getOrThrow(key)
     }
@@ -65,7 +38,7 @@ open class ConfigurationPlugin : Plugin<Project> {
     val huaweiAppGalleryUrl = properties.getProperty("app.huawei_download_url", null)
     val amazonAppStoreUrl = properties.getProperty("app.amazon_download_url", null)
     val isExampleBuild = applicationId.startsWith("com.example.") || applicationId.startsWith("org.example.")
-    val isExperimentalBuild = isExampleBuild || keystore == null || properties.getProperty("app.experimental", "false") == "true"
+    val isExperimentalBuild = isExampleBuild || properties.getProperty("app.experimental", "false") == "true"
     val doNotObfuscate = isExampleBuild || properties.getProperty("app.dontobfuscate", "false") == "true"
     val forceOptimize = properties.getProperty("app.forceoptimize") == "true"
     val appExtension = getOrSample("tgx.extension")
@@ -149,9 +122,7 @@ open class ConfigurationPlugin : Plugin<Project> {
       pullRequests,
 
       outputFileNamePrefix,
-      creationDateMillis,
-
-      keystore
+      creationDateMillis
     )
     project.extra.set("config", config)
   }

@@ -147,24 +147,9 @@ open class ModulePlugin : Plugin<Project> {
             targetSdk = versions.targetSdk
             multiDexEnabled = true
           }
-          config?.keystore?.let { keystore ->
-            signingConfigs {
-              arrayOf(
-                getByName("debug"),
-                maybeCreate("release")
-              ).forEach { config ->
-                config.storeFile = keystore.file
-                config.storePassword = keystore.password
-                config.keyAlias = keystore.keyAlias
-                config.keyPassword = keystore.keyPassword
-                config.enableV2Signing = true
-              }
-            }
-
+          config?.let { config ->
             buildTypes {
               getByName("debug") {
-                signingConfig = signingConfigs["debug"]
-
                 isDebuggable = true
                 isJniDebuggable = true
                 isMinifyEnabled = false
@@ -183,8 +168,6 @@ open class ModulePlugin : Plugin<Project> {
               }
 
               getByName("release") {
-                signingConfig = signingConfigs["release"]
-
                 isMinifyEnabled = !config.doNotObfuscate
                 isShrinkResources = !config.doNotObfuscate
 

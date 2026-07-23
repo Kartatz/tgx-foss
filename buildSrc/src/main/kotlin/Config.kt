@@ -16,7 +16,6 @@
 import tgx.gradle.fatal
 import tgx.gradle.getLongOrThrow
 import tgx.gradle.getOrThrow
-import tgx.gradle.plugin.Keystore
 import java.util.*
 
 object Config {
@@ -88,9 +87,7 @@ data class ApplicationConfig(
   val pullRequests: List<PullRequest>,
 
   val outputFileNamePrefix: String,
-  val creationDateMillis: Long,
-
-  val keystore: Keystore?
+  val creationDateMillis: Long
 )
 
 class AbiVariant (val flavor: String, vararg val filters: String = arrayOf(), val displayName: String = filters[0]) {

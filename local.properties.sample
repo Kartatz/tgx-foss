@@ -7,9 +7,6 @@
 # Path to Android SDK
 sdk.dir=
 
-## Path to the keystore file
-keystore.file=
-
 ## Package name
 app.id=org.example.tgx
 

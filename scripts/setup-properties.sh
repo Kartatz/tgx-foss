@@ -11,9 +11,6 @@ done
 while [[ ! ($TELEGRAM_API_HASH =~ ^[0-9a-z]+$) ]]; do
   read -r -p "Telegram API_HASH: " TELEGRAM_API_HASH
 done
-while [[ ! -f $KEYSTORE_FILE ]]; do
-  read -e -r -p "Enter a path to keystore settings file: " KEYSTORE_FILE
-done
 while [[ ! ($APP_ID =~ ^[a-z.]+$) ]]; do
   read -r -p "Enter package identifier: " APP_ID
 done
@@ -31,7 +28,6 @@ done
 cat <<EOF > local.properties
 sdk.dir=$ANDROID_SDK_ROOT
 org.gradle.workers.max=$CPU_COUNT
-keystore.file=$KEYSTORE_FILE
 app.id=$APP_ID
 app.name=$APP_NAME
 app.download_url=$APP_DOWNLOAD_URL
