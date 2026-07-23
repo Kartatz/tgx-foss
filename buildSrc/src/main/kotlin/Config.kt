@@ -144,19 +144,9 @@ object Sdk {
   const val LATEST = 3
 
   val VARIANTS = mapOf(
-    Pair(LOLLIPOP, SdkVariant(
-      flavor = "lollipop",
-      minSdk = 21,
-      maxSdk = 22
-    )),
     Pair(MARSHMALLOW, SdkVariant(
       flavor = "marshmallow",
       minSdk = 23,
-      maxSdk = 23
-    )),
-    Pair(LATEST, SdkVariant(
-      flavor = "latest",
-      minSdk = 24,
       displayName = null
     ))
   )

@@ -236,7 +236,7 @@ android {
     Sdk.VARIANTS.forEach { (sdkIndex, variant) ->
       create(variant.flavor) {
         dimension = "SDK"
-        isDefault = sdkIndex == Sdk.LATEST
+        isDefault = sdkIndex == Sdk.MARSHMALLOW
 
         val actualMinSdk = if (config.isHuaweiBuild) {
           maxOf(variant.minSdk, Config.MIN_SDK_VERSION_HUAWEI)
