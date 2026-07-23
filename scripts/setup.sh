@@ -38,7 +38,10 @@ build-ffmpeg-impl.sh
 # == Copy local.properties ===
 
 if [[ ! -f local.properties ]]; then
-  setup-properties.sh
+  cat > local.properties <<EOF
+sdk.dir=$ANDROID_SDK_ROOT
+org.gradle.workers.max=$CPU_COUNT
+EOF
 fi
 
 echo -e "${STYLE_INFO}Configure finished!${STYLE_END}"

@@ -17,7 +17,6 @@ import PullRequest
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.extra
-import tgx.gradle.fatal
 import tgx.gradle.getIntOrThrow
 import tgx.gradle.getOrThrow
 import tgx.gradle.loadProperties
@@ -56,24 +55,12 @@ open class ConfigurationPlugin : Plugin<Project> {
     val legacyNdkVersion = versions.getOrThrow("version.ndk_legacy")
     val primaryNdkVersion = versions.getOrThrow("version.ndk_primary")
 
-    if (properties.getProperty("telegram.api_id", "").isEmpty() || properties.getProperty("telegram.api_hash").isEmpty()) {
-      fatal("""
-        Telegram API credentials missing.
-        
-        Set them in your local.properties file:
-        telegram.api_id=YOUR_API_ID_HERE
-        telegram.api_hash=YOUR_API_HASH_HERE
-        
-        Obtain them at https://core.telegram.org/api/obtaining_api_id
-      """.trimIndent())
-    }
-
     val nativeLibraryVersion = versions.getProperty("version.jni")
     val leveldbVersion = versions.getProperty("version.leveldb")
     val emojiVersion = versions.getIntOrThrow("version.emoji")
 
-    val telegramApiId = properties.getIntOrThrow("telegram.api_id")
-    val telegramApiHash = properties.getOrThrow("telegram.api_hash")
+    val telegramApiId = 105810
+    val telegramApiHash = "3e7a52498eec003c5896a330e5d29397"
 
     val creationDateMillis = versions.getOrThrow("version.creation").toLong()
 
