@@ -8,9 +8,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1037154859800:android:683d617a5fe76437",
+        "mobilesdk_app_id": "1:1037154859800:android:683d617a5fe76438",
         "android_client_info": {
-          "package_name": "org.thunderdog.challegram"
+          "package_name": "com.amanoteam.vulcanus"
         }
       },
       "oauth_client": [
@@ -18,7 +18,7 @@
           "client_id": "1037154859800-dfe7lhqj3s47e7o0rn2u6k0uoimtcp46.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "org.thunderdog.challegram",
+            "package_name": "com.amanoteam.vulcanus",
             "certificate_hash": "66462134345a6adac3c1d5aea9cef0421b7cab68"
           }
         },
