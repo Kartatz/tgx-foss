@@ -229,6 +229,8 @@ configure_and_build() {
     ;;
   esac
 
+  EXTRA_LIBS="$(${CC} -print-libgcc-file-name)"
+
   build_one
 }
 
