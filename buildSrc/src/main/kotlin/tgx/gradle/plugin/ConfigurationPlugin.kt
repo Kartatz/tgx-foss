@@ -36,7 +36,7 @@ open class ConfigurationPlugin : Plugin<Project> {
     val galaxyStoreUrl = properties.getProperty("app.galaxy_download_url", null)
     val huaweiAppGalleryUrl = properties.getProperty("app.huawei_download_url", null)
     val amazonAppStoreUrl = properties.getProperty("app.amazon_download_url", null)
-    val isExampleBuild = applicationId.startsWith("com.example.") || applicationId.startsWith("org.example.")
+    val isExampleBuild = false
     val isExperimentalBuild = isExampleBuild || properties.getProperty("app.experimental", "false") == "true"
     val doNotObfuscate = isExampleBuild || properties.getProperty("app.dontobfuscate", "false") == "true"
     val forceOptimize = properties.getProperty("app.forceoptimize") == "true"
