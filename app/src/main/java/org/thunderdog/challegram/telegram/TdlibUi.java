@@ -4487,9 +4487,6 @@ public class TdlibUi extends Handler {
   // Map
 
   public boolean openMap (TdlibDelegate context, MapController.Args args) {
-    if (!U.isGooglePlayServicesAvailable(context.context())) {
-      return Intents.openMap(args.latitude, args.longitude, args.title, args.address);
-    }
     MapController<?,?> c = MapControllerFactory.newMapController(context.context(), context.tdlib());
     c.setArguments(args);
     context.context().navigation().navigateTo(c);

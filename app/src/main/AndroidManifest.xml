@@ -85,10 +85,6 @@
   <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
   <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-  <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
-
-  <uses-permission android:name="${applicationId}.permission.C2D_MESSAGE" />
-
   <uses-permission android:name="com.sec.android.provider.badge.permission.READ" />
   <uses-permission android:name="com.sec.android.provider.badge.permission.WRITE" />
   <uses-permission android:name="com.htc.launcher.permission.READ_SETTINGS" />
@@ -140,22 +136,6 @@
     tools:targetApi="37"
     tools:ignore="RtlEnabled">
 
-    <meta-data
-      android:name="firebase_analytics_collection_deactivated"
-      android:value="true" />
-    <meta-data
-      android:name="firebase_analytics_collection_enabled"
-      android:value="false" />
-    <meta-data
-      android:name="google_analytics_adid_collection_enabled"
-      android:value="false" />
-
-    <service android:name=".service.FirebaseListenerService"
-      android:exported="false">
-      <intent-filter>
-        <action android:name="com.google.firebase.MESSAGING_EVENT" />
-      </intent-filter>
-    </service>
     <service
       android:name=".service.NetworkListenerService"
       android:enabled="true"

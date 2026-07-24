@@ -16,8 +16,6 @@ androidx-interpolator = "1.0.0"
 
 google-zxing = "3.5.4"
 
-google-services-plugin = "4.5.0"
-
 huawei-agcp = "1.9.3.302"
 huawei-hms = "6.13.0.300"
 
@@ -52,10 +50,6 @@ androidx-exifinterface-latest = "1.4.2"
 androidx-camera-latest = "1.6.1"
 androidx-media-latest = "1.10.1"
 
-firebase-messaging-latest = "25.1.1"
-
-google-play-services-base-latest = "18.10.0"
-
 osmdroid = "6.1.20"
 
 # marshmallow
@@ -67,11 +61,6 @@ androidx-activity-lollipop = "1.11.0" # 1.12.2+ requires minSdk 23
 androidx-work-lollipop = "2.10.5" # 2.11.0+ requires minSdk 23
 androidx-browser-lollipop = "1.9.0"
 androidx-media-lollipop = "1.8.0" # 1.9.0+ requires minSdk 23
-
-firebase-messaging-lollipop = "24.1.2" # 25.0.0+ requires minSdk 23
-
-google-play-services-base-lollipop = "18.7.2" # 18.8.0+ requires minSdk 23
-google-play-services-basement-lollipop = "18.7.1" # 18.7.2 was not released
 
 # legacy
 
@@ -88,10 +77,6 @@ androidx-browser-legacy = "1.5.0" # 1.7.0+ requires minSdk 19
 androidx-exifinterface-legacy = "1.3.7" # 1.4.0+ requires minSdk 21
 androidx-camera-legacy = "1.4.2" # 1.6.0+ requires minSdk 23
 androidx-media-legacy = "1.2.1" # 1.3.0+ requires minSdk 19, 1.5.0+ requires minSdk 21
-
-firebase-messaging-legacy = "22.0.0" # 23.0.0+ requires minSdk 19
-
-google-play-services-base-legacy = "17.6.0" # 18.0.0+ requires minSdk 21
 
 [libraries]
 desugaring = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugaring" }
@@ -174,18 +159,7 @@ androidx-media-effect-legacy = { module = "androidx.media3:media3-effect", versi
 androidx-media-effect-lollipop = { module = "androidx.media3:media3-effect", version.ref = "androidx-media-lollipop" }
 androidx-media-effect-latest = { module = "androidx.media3:media3-effect", version.ref = "androidx-media-latest" }
 
-google-firebase-messaging-legacy = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging-legacy" }
-google-firebase-messaging-lollipop = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging-lollipop" }
-google-firebase-messaging-latest = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging-latest" }
-
 google-zxing-core = { module = "com.google.zxing:core", version.ref = "google-zxing" }
-
-google-play-services-base-legacy = { module = "com.google.android.gms:play-services-base", version.ref = "google-play-services-base-legacy" }
-google-play-services-base-lollipop = { module = "com.google.android.gms:play-services-base", version.ref = "google-play-services-base-lollipop" }
-google-play-services-base-latest = { module = "com.google.android.gms:play-services-base", version.ref = "google-play-services-base-latest" }
-google-play-services-basement-legacy = { module = "com.google.android.gms:play-services-basement", version.ref = "google-play-services-base-legacy" }
-google-play-services-basement-lollipop = { module = "com.google.android.gms:play-services-basement", version.ref = "google-play-services-basement-lollipop" }
-google-play-services-basement-latest = { module = "com.google.android.gms:play-services-basement", version.ref = "google-play-services-base-latest" }
 
 osmdroid = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroid" }
 
@@ -212,7 +186,5 @@ annotations-kotlin = { module = "org.jetbrains.kotlin:kotlin-annotations-jvm", v
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
 android-library = { id = "com.android.library", version.ref = "android-gradle-plugin" }
-
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services-plugin" }
 
 kotlin-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -503,7 +503,6 @@ public class TdlibNotificationManager implements UI.StateListener, Passcode.Lock
   public boolean hasLocalNotificationProblem () {
     return areNotificationsBlockedGlobally() || areNotificationsBlocked(scopePrivate()) ||
       areNotificationsBlocked(scopeGroup()) || areNotificationsBlocked(scopeChannel()) ||
-      !hasRemotePushService() ||
       tdlib.notifications().getNotificationBlockStatus() == TdlibNotificationManager.Status.ACCOUNT_NOT_SELECTED;
   }
 
@@ -591,18 +590,19 @@ public class TdlibNotificationManager implements UI.StateListener, Passcode.Lock
     }
     boolean hasPushServices = hasRemotePushService();
     if (!hasPushServices) {
-      // Sync matters only when push service (firebase, hms, ...) unavailable
+      // No remote push service (Firebase, HMS, ...) available. The SyncAdapter provides
+      // background delivery via polling, so account sync must be enabled for it to work.
       if (isSyncDisabledGlobally())
         return Status.DISABLED_SYNC;
       if (isSyncDisabledForApp())
         return Status.DISABLED_APP_SYNC;
-      return Status.PUSH_SERVICE_MISSING;
+      // Sync enabled: polling is functional. Fall through to the regular problem checks.
     }
     if (tdlib.settings().hasNotificationProblems())
       return Status.INTERNAL_ERROR;
     if (!tdlib.account().forceEnableNotifications() && Settings.instance().checkNotificationFlag(Settings.NOTIFICATION_FLAG_ONLY_SELECTED_ACCOUNTS))
       return Status.ACCOUNT_NOT_SELECTED;
-    if (tdlib.context().getTokenState() == TdlibManager.TokenState.ERROR)
+    if (hasPushServices && tdlib.context().getTokenState() == TdlibManager.TokenState.ERROR)
       return Status.PUSH_SERVICE_ERROR;
     return Status.NOT_BLOCKED;
   }

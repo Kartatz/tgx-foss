@@ -124,7 +124,7 @@ public class Config {
   public static final boolean SERVICES_ENABLED = true; // !BuildConfig.DEBUG;
 
   public static final boolean PIN_BITMAP_ENABLED = Build.VERSION.SDK_INT < Build.VERSION_CODES.M && Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB;
-  public static final boolean GCM_ENABLED = true;
+  public static final boolean GCM_ENABLED = false;
 
   public static final boolean ALLOW_SYSTEM_EMOJI = BuildConfig.DEBUG;
 

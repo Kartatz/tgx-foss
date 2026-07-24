@@ -114,9 +114,6 @@ import androidx.media3.extractor.DefaultExtractorsFactory;
 import androidx.media3.extractor.ExtractorInput;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
-
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.config.Config;
 import org.thunderdog.challegram.config.Device;
@@ -819,17 +816,6 @@ public class U {
 
   public static MediaSource newMediaSource (int accountId, int fileId) {
     return new ProgressiveMediaSource.Factory(new TdlibDataSource.Factory(accountId)).createMediaSource(newMediaItem(TdlibDataSource.UriFactory.create(accountId, fileId)));
-  }
-
-  public static boolean isGooglePlayServicesAvailable (Context context) {
-    try {
-      if (context != null && Config.GCM_ENABLED) {
-        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
-        int resultCode = googleApiAvailability.isGooglePlayServicesAvailable(context);
-        return resultCode == ConnectionResult.SUCCESS;
-      }
-    } catch (Throwable ignored) { }
-    return false;
   }
 
   @SuppressWarnings("deprecation")

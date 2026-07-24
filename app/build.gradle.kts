@@ -21,10 +21,6 @@ val updateLanguages = tasks.register<FetchLanguagesTask>("updateLanguages") {
   group = "Setup"
   description = "Generates and updates all strings.xml resources based on translations.telegram.org"
 }
-val validateApiTokens = tasks.register<ValidateApiTokensTask>("validateApiTokens") {
-  group = "Setup"
-  description = "Validates some API tokens to make sure they work properly and won't cause problems"
-}
 val updateExceptions = tasks.register<UpdateExceptionsTask>("updateExceptions") {
   group = "Setup"
   description = "Updates exception class names with the app or TDLib version number in order to have separate group on Google Play Developer Console"
@@ -497,9 +493,6 @@ gradle.projectsEvaluated {
     it.startsWith("pre") && it.endsWith("ReleaseBuild")
   }.configureEach {
     dependsOn(updateLanguages)
-    if (!config.isExperimentalBuild) {
-      dependsOn(validateApiTokens)
-    }
   }
 }
 
@@ -573,27 +566,6 @@ dependencies {
     libs.androidx.camera.view.legacy,
     libs.androidx.camera.view.latest
   )
-  // Google Play Services: https://developers.google.com/android/guides/releases
-  flavorImplementation(
-    libs.google.play.services.base.legacy,
-    libs.google.play.services.base.lollipop,
-    libs.google.play.services.base.latest
-  )
-  flavorImplementation(
-    libs.google.play.services.basement.legacy,
-    libs.google.play.services.basement.lollipop,
-    libs.google.play.services.basement.latest
-  )
-    // Firebase: https://firebase.google.com/support/release-notes/android
-  flavorImplementation(
-    libs.google.firebase.messaging.legacy,
-    libs.google.firebase.messaging.lollipop,
-    libs.google.firebase.messaging.latest
-   ) {
-     exclude(group = "com.google.firebase", module = "firebase-core")
-     exclude(group = "com.google.firebase", module = "firebase-analytics")
-     exclude(group = "com.google.firebase", module = "firebase-measurement-connector")
-   }
    // AndroidX/media: https://github.com/androidx/media/blob/release/RELEASENOTES.md
   flavorImplementation(
     libs.androidx.media.common.legacy,
@@ -659,9 +631,6 @@ dependencies {
   compileOnly(libs.annotations.kotlin)
 }
 
-if (!config.isExperimentalBuild) {
-  apply(plugin = libs.plugins.google.services.get().pluginId)
-  if (config.isHuaweiBuild) {
-    apply(plugin = libs.huawei.agconnect.get().group)
-  }
+if (config.isHuaweiBuild) {
+  apply(plugin = libs.huawei.agconnect.get().group)
 }
