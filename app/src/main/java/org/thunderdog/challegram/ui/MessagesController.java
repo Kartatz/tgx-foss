@@ -64,16 +64,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.PagerAdapter;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-
 import org.drinkless.tdlib.Client;
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.BaseActivity;
@@ -4392,9 +4382,6 @@ public class MessagesController extends ViewController<MessagesController.Argume
         inputView.performDestroy();
       if (wallpaperView != null)
         wallpaperView.performDestroy();
-      if (googleClient != null) {
-        closeGoogleClient();
-      }
       if (botHelper != null) {
         botHelper.destroy();
       }
@@ -7714,23 +7701,9 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
   }
 
-  private GoogleApiClient googleClient;
-
-  private void closeGoogleClient () {
-    if (googleClient != null) {
-      try {
-        googleClient.disconnect();
-      } catch (Throwable t) {
-        Log.w("GoogleApiClient throws", t);
-      }
-      googleClient = null;
-    }
-  }
-
   private boolean currentShareLocationDestroyKeyboard;
   private long currentShareLocationChatId;
 
-  @SuppressWarnings("deprecation")
   private void shareCurrentLocation (final boolean destroyKeyboard) {
     currentShareLocationDestroyKeyboard = destroyKeyboard;
     currentShareLocationChatId = getChatId();
@@ -7740,47 +7713,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
       return;
     }
 
-    try {
-      if (googleClient == null) {
-        GoogleApiClient.Builder b = new GoogleApiClient.Builder(context());
-        b.addApi(LocationServices.API);
-        googleClient = b.build();
-        googleClient.connect();
-      }
-
-      final LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
-        .addLocationRequest(LocationRequest.create())
-        .setAlwaysShow(true);
-      final LocationSettingsRequest request = builder.build();
-      final PendingResult<LocationSettingsResult> result =
-        LocationServices.SettingsApi.checkLocationSettings(googleClient, request);
-
-      result.setResultCallback(result1 -> {
-        final Status status = result1.getStatus();
-        //final LocationSettingsStates state = result.getLocationSettingsStates();
-        switch (status.getStatusCode()) {
-          case LocationSettingsStatusCodes.RESOLUTION_REQUIRED: {
-            try {
-              status.startResolutionForResult(context(), Intents.ACTIVITY_RESULT_RESOLUTION);
-            } catch (Throwable t) {
-              getCustomCurrentLocation(destroyKeyboard, true, false);
-            }
-            break;
-          }
-          case LocationSettingsStatusCodes.SUCCESS: {
-            getCurrentLocation(destroyKeyboard, googleClient);
-            break;
-          }
-          case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-          default: {
-            getCurrentLocation(destroyKeyboard, googleClient);
-            break;
-          }
-        }
-      });
-    } catch (Throwable t) {
-      shareCurrentLocation(destroyKeyboard, null);
-    }
+    shareCurrentLocationViaManager(destroyKeyboard);
   }
 
   public void sendPickedLocation (TdApi.Location location, final TdApi.MessageSendOptions sendOptions) {
@@ -7819,70 +7752,8 @@ public class MessagesController extends ViewController<MessagesController.Argume
     // TODO run MediaLayout with only map available
   }
 
-  private void getCurrentLocation (final boolean destroyKeyboard, @Nullable GoogleApiClient client) {
-    if (client != null && USE_GOOGLE_LOCATION) {
-      getCurrentLocationViaGoogleApiClient(destroyKeyboard, client);
-    } else {
-      shareCurrentLocationViaManager(destroyKeyboard);
-    }
-  }
-
   private static final long LOCATION_MAX_WAIT_TIME = 3000L;
-  private static final boolean USE_GOOGLE_LOCATION = true;
   private static final boolean USE_LAST_KNOWN_LOCATION = false;
-
-  @SuppressWarnings("deprecation")
-  private void getCurrentLocationViaGoogleApiClient (final boolean destroyKeyboard, final @NonNull GoogleApiClient client) {
-    final CancellableRunnable[] timeout = new CancellableRunnable[1];
-    final boolean[] sent = new boolean[1];
-    final LocationListener listener = location -> {
-      timeout[0].cancel();
-      if (!sent[0]) {
-        sent[0] = true;
-        shareCurrentLocation(destroyKeyboard, location);
-      }
-    };
-    timeout[0] = new CancellableRunnable() {
-      @Override
-      public void act () {
-        if (!sent[0]) {
-          sent[0] = true;
-          try {
-            LocationServices.FusedLocationApi.removeLocationUpdates(googleClient, listener);
-          } catch (Throwable t) {
-            Log.w("Error removeLocationUpdates", t);
-          }
-          Location location = null;
-          try {
-            location = LocationServices.FusedLocationApi.getLastLocation(client);
-          } catch (SecurityException ignored) { }
-            catch (Throwable t) {
-            Log.w("getLastLocation error", t);
-          }
-          if (location == null && USE_LAST_KNOWN_LOCATION) {
-            location = U.getLastKnownLocation(context(), false);
-          }
-          if (location != null) {
-            shareCurrentLocation(destroyKeyboard, location);
-          } else {
-            getCustomCurrentLocation(destroyKeyboard, false, true);
-          }
-        }
-      }
-    };
-    UI.post(timeout[0], LOCATION_MAX_WAIT_TIME);
-    try {
-      LocationRequest request = LocationRequest.create().setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY).setExpirationDuration(LOCATION_MAX_WAIT_TIME).setNumUpdates(1).setMaxWaitTime(5000L);
-      LocationServices.FusedLocationApi.requestLocationUpdates(googleClient, request, listener);
-    } catch (SecurityException ignored) {
-      sent[0] = true;
-      shareCurrentLocationViaManager(destroyKeyboard);
-    } catch (Throwable t) {
-      Log.w("requestLocationUpdates error", t);
-      sent[0] = true;
-      shareCurrentLocationViaManager(destroyKeyboard);
-    }
-  }
 
   private void shareCurrentLocationViaManager (final boolean destroyKeyboard) {
     try {
@@ -10148,7 +10019,7 @@ public class MessagesController extends ViewController<MessagesController.Argume
     }
     switch (requestCode) {
       case Intents.ACTIVITY_RESULT_RESOLUTION: {
-        getCurrentLocation(currentShareLocationDestroyKeyboard, googleClient);
+        shareCurrentLocationViaManager(currentShareLocationDestroyKeyboard);
         break;
       }
       case Intents.ACTIVITY_RESULT_IMAGE_CAPTURE:

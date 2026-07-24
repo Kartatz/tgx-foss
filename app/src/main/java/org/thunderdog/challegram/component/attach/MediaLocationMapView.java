@@ -30,14 +30,6 @@ import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
 
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.PendingResult;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResult;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -381,12 +373,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       try {
         mapView.onDestroy();
       } catch (Throwable ignored) { }
-      if (googleClient != null) {
-        try {
-          googleClient.disconnect();
-        } catch (Throwable ignored) { }
-        googleClient = null;
-      }
+
     }
   }
 
@@ -555,15 +542,13 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     setIgnoreMyLocation(false, true);
   }
 
-  private GoogleApiClient googleClient;
-  private boolean noGoogleApiClient;
   private boolean locationResolutionRequired;
 
   public void onResolutionComplete (boolean isOk) {
     locationPointView.setShowProgress(isOk);
     if (isOk) {
       locationResolutionRequired = false;
-      checkLocationSettings(true, false);
+      focusOnMyLocation();
     }
   }
 
@@ -595,80 +580,10 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       googleMap.setMyLocationEnabled(true);
     }
 
-    if (noGoogleApiClient) {
-      locationPointView.setShowProgress(false);
-      if (requestedByUser) {
-        focusOnMyLocation();
-      }
-      return;
+    locationPointView.setShowProgress(false);
+    if (requestedByUser) {
+      focusOnMyLocation();
     }
-
-    try {
-      if (googleClient == null) {
-        GoogleApiClient.Builder b = new GoogleApiClient.Builder(getContext());
-        b.addApi(LocationServices.API);
-        b.addOnConnectionFailedListener(connectionResult -> {
-          if (!noGoogleApiClient) {
-            noGoogleApiClient = true;
-            checkLocationSettings(false, false);
-          }
-        });
-        googleClient = b.build();
-        googleClient.connect();
-      }
-
-      LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
-          .addLocationRequest(LocationRequest.create())
-          .setAlwaysShow(true);
-
-      final LocationSettingsRequest request = builder.build();
-      final PendingResult<LocationSettingsResult> result =
-          LocationServices.SettingsApi.checkLocationSettings(googleClient, request);
-
-      result.setResultCallback(result1 -> {
-        final Status status = result1.getStatus();
-        //final LocationSettingsStates state = result.getLocationSettingsStates();
-        switch (status.getStatusCode()) {
-          case LocationSettingsStatusCodes.RESOLUTION_REQUIRED: {
-            if (!requestedByUser || disablePrompts) {
-              setShowMyLocationButton(true);
-              locationResolutionRequired = true;
-              break;
-            }
-
-            try {
-              status.startResolutionForResult(((BaseActivity) getContext()), Intents.ACTIVITY_RESULT_RESOLUTION);
-            } catch (Throwable t) {
-              // Ignore the error.
-            }
-            break;
-          }
-          case LocationSettingsStatusCodes.SUCCESS: {
-            if (requestedByUser) {
-              if (!result1.getLocationSettingsStates().isLocationUsable()) {
-                locationPointView.setShowProgress(false);
-              }
-              focusOnMyLocation();
-            }
-            break;
-          }
-          case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-          default: {
-            locationPointView.setShowProgress(false);
-            if (requestedByUser) {
-              focusOnMyLocation();
-            }
-            break;
-          }
-        }
-      });
-    } catch (Throwable t) {
-      Log.w("Error", t);
-      noGoogleApiClient = true;
-      checkLocationSettings(requestedByUser, disablePrompts);
-    }
-
-    // GoogleApiClient client = new GoogleApiClient.Builder(getContext()).addApiIfAvailable(Drive).build();
   }
 
   // positioning
