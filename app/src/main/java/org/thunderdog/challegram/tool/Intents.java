@@ -64,7 +64,6 @@ import me.vkryl.core.StringUtils;
 import me.vkryl.core.lambda.RunnableBool;
 
 public class Intents {
-  public static final int ACTIVITY_RESULT_GOOGLE_PLAY_UPDATE = 10001;
   public static final int ACTIVITY_RESULT_GOOGLE_LOCATION_REQUEST = 10002;
   public static final int ACTIVITY_RESULT_IMAGE_CAPTURE = 100;
   public static final int ACTIVITY_RESULT_GALLERY = 101;

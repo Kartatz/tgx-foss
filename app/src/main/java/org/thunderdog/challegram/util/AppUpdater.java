@@ -9,32 +9,18 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * File created on 19/06/2022, 02:06.
  */
 package org.thunderdog.challegram.util;
-
-import android.app.Activity;
-import android.content.Intent;
-import android.content.IntentSender;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.play.core.appupdate.AppUpdateInfo;
-import com.google.android.play.core.appupdate.AppUpdateManager;
-import com.google.android.play.core.appupdate.AppUpdateManagerFactory;
-import com.google.android.play.core.install.InstallState;
-import com.google.android.play.core.install.InstallStateUpdatedListener;
-import com.google.android.play.core.install.model.ActivityResult;
-import com.google.android.play.core.install.model.AppUpdateType;
-import com.google.android.play.core.install.model.InstallErrorCode;
-import com.google.android.play.core.install.model.InstallStatus;
-import com.google.android.play.core.install.model.UpdateAvailability;
-
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.BaseActivity;
 import org.thunderdog.challegram.BuildConfig;
-import org.thunderdog.challegram.Log;
 import org.thunderdog.challegram.R;
 import org.thunderdog.challegram.core.Lang;
 import org.thunderdog.challegram.data.TD;
@@ -43,7 +29,6 @@ import org.thunderdog.challegram.telegram.ConnectionListener;
 import org.thunderdog.challegram.telegram.FileUpdateListener;
 import org.thunderdog.challegram.telegram.Tdlib;
 import org.thunderdog.challegram.telegram.TdlibContext;
-import org.thunderdog.challegram.tool.Intents;
 import org.thunderdog.challegram.tool.Strings;
 import org.thunderdog.challegram.tool.UI;
 import org.thunderdog.challegram.unsorted.Settings;
@@ -58,7 +43,7 @@ import me.vkryl.core.lambda.RunnableBool;
 import me.vkryl.core.reference.ReferenceList;
 import tgx.td.Td;
 
-public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListener, ConnectionListener {
+public class AppUpdater implements FileUpdateListener, ConnectionListener {
   public interface Listener {
     void onAppUpdateStateChanged (@State int state, @State int oldState, boolean isApk);
     default void onAppUpdateDownloadProgress (long bytesDownloaded, long totalBytesToDownload) { }
@@ -85,22 +70,16 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   @Retention(RetentionPolicy.SOURCE)
   @IntDef({
     FlowType.NONE,
-    FlowType.TELEGRAM_CHANNEL,
-    FlowType.GOOGLE_PLAY
+    FlowType.TELEGRAM_CHANNEL
   })
   public @interface FlowType {
     int
       NONE = 0,
-      TELEGRAM_CHANNEL = 1,
-      GOOGLE_PLAY = 2;
+      TELEGRAM_CHANNEL = 1;
   }
 
   private final BaseActivity context;
   private final ReferenceList<Listener> listeners;
-
-  private final AppUpdateManager googlePlayUpdateManager;
-  private AppUpdateInfo googlePlayUpdateInfo;
-  private boolean googlePlayFlowError;
 
   private boolean updateOffered;
 
@@ -110,7 +89,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   @FlowType
   private int flowType;
 
-  private boolean forceTelegramChannelFlow;
   private Tdlib telegramChannelTdlib;
   private Tdlib.UpdateFileInfo telegramChannelFile;
 
@@ -120,15 +98,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
   public AppUpdater (BaseActivity context) {
     this.context = context;
     this.listeners = new ReferenceList<>();
-    AppUpdateManager appUpdateManager = null;
-    if (AppInstallationUtil.allowInAppGooglePlayUpdates(context)) {
-      try {
-        appUpdateManager = AppUpdateManagerFactory.create(context);
-      } catch (Throwable t) {
-        Log.e("Unable to initialize Google Play update manager", t);
-      }
-    }
-    this.googlePlayUpdateManager = appUpdateManager;
   }
 
   @State
@@ -169,21 +138,10 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
 
   public void checkForUpdates () {
     if (state == State.NONE) {
-      if (preferTelegramChannelFlow()) {
-        checkForTelegramChannelUpdates();
-      } else {
-        checkForGooglePlayUpdates();
-      }
+      checkForTelegramChannelUpdates();
     } else if (state == State.AVAILABLE) {
       offerUpdate();
     }
-  }
-
-  private boolean preferTelegramChannelFlow () {
-    // TODO: add server config to force
-    return googlePlayUpdateManager == null ||
-      forceTelegramChannelFlow ||
-      (googlePlayFlowError && AppInstallationUtil.isAppSideLoaded(UI.getAppContext()));
   }
 
   public static AppInstallationUtil.PublicMarketUrls publicMarketUrls () {
@@ -209,113 +167,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
       for (Listener listener : listeners) {
         listener.onAppUpdateStateChanged(state, oldState, flowType == FlowType.TELEGRAM_CHANNEL);
       }
-    }
-  }
-
-  private void checkForGooglePlayUpdates () {
-    if (googlePlayUpdateManager == null)
-      return;
-    setState(State.CHECKING);
-    googlePlayUpdateManager.getAppUpdateInfo().addOnSuccessListener(updateInfo -> {
-      this.googlePlayUpdateInfo = updateInfo;
-      int installStatus = updateInfo.installStatus();
-      if (installStatus == InstallStatus.DOWNLOADED) {
-        onUpdateAvailable(FlowType.GOOGLE_PLAY, updateInfo.bytesDownloaded(), updateInfo.totalBytesToDownload(), "#" + (updateInfo.availableVersionCode() / 1000), null, true);
-      } else if (installStatus == InstallStatus.FAILED) {
-        onGooglePlayFlowError();
-      } else {
-        int updateAvailability = updateInfo.updateAvailability();
-        switch (updateAvailability) {
-          case UpdateAvailability.UPDATE_AVAILABLE: {
-            onUpdateAvailable(FlowType.GOOGLE_PLAY, updateInfo.bytesDownloaded(), updateInfo.totalBytesToDownload(), "#" + (updateInfo.availableVersionCode() / 1000), null, false);
-            break;
-          }
-          case UpdateAvailability.UNKNOWN: {
-            onGooglePlayFlowError();
-            break;
-          }
-          case UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS:
-          case UpdateAvailability.UPDATE_NOT_AVAILABLE: {
-            if (AppInstallationUtil.isAppSideLoaded(UI.getAppContext())) {
-              onGooglePlayFlowError();
-            } else {
-              onUpdateUnavailable();
-            }
-            break;
-          }
-        }
-      }
-    }).addOnFailureListener(e -> {
-      Log.i("Unable to check for app updates", e);
-      onGooglePlayFlowError();
-    });
-  }
-
-  private void onGooglePlayFlowError () {
-    if (!this.googlePlayFlowError) {
-      this.googlePlayFlowError = true;
-      if (preferTelegramChannelFlow()) {
-        checkForTelegramChannelUpdates();
-      } else {
-        onUpdateUnavailable();
-      }
-    }
-  }
-
-  private boolean offerGooglePlayUpdate () {
-    int updateType;
-    if (context.hasTdlib()) {
-      Tdlib tdlib = context.currentTdlib();
-      updateType = tdlib.context().inRecoveryMode() || !tdlib.context().hasActiveAccounts() ? AppUpdateType.IMMEDIATE : AppUpdateType.FLEXIBLE;
-    } else {
-      updateType = AppUpdateType.IMMEDIATE;
-    }
-    if (googlePlayUpdateInfo.isUpdateTypeAllowed(updateType)) {
-      try {
-        googlePlayUpdateManager.startUpdateFlowForResult(googlePlayUpdateInfo, updateType, context, Intents.ACTIVITY_RESULT_GOOGLE_PLAY_UPDATE);
-        return true;
-      } catch (IntentSender.SendIntentException e) {
-        Log.e("Unable to offer an update", e);
-      }
-    }
-    return false;
-  }
-
-  public void onGooglePlayFlowActivityResult (int resultCode, Intent data) {
-    switch (resultCode) {
-      case BaseActivity.RESULT_OK: {
-        try {
-          googlePlayUpdateManager.registerListener(this);
-        } catch (Throwable t) {
-          Log.e("Unable to register listener", t);
-        }
-        break;
-      }
-      case Activity.RESULT_CANCELED:
-      case ActivityResult.RESULT_IN_APP_UPDATE_FAILED: {
-        onGooglePlayFlowError();
-        break;
-      }
-    }
-  }
-
-  @Override
-  public void onStateUpdate (@NonNull InstallState state) {
-    final int installStatus = state.installStatus();
-    if (installStatus == InstallStatus.FAILED) {
-      final int errorCode = state.installErrorCode();
-      Log.i("Google Play update failed, code: %d", errorCode);
-      if (errorCode == InstallErrorCode.ERROR_PLAY_STORE_NOT_FOUND ||
-        errorCode == InstallErrorCode.ERROR_APP_NOT_OWNED) {
-        forceTelegramChannelFlow = true;
-      }
-      onGooglePlayFlowError();
-    } else if (installStatus == InstallStatus.DOWNLOADING) {
-      onUpdateDownloading();
-      onUpdateDownloadProgress(state.bytesDownloaded(), state.totalBytesToDownload());
-    } else if (installStatus == InstallStatus.DOWNLOADED) {
-      googlePlayUpdateManager.unregisterListener(this);
-      onUpdateAvailable(FlowType.GOOGLE_PLAY, state.bytesDownloaded(), state.totalBytesToDownload(), displayVersion, commit, true);
     }
   }
 
@@ -456,10 +307,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
         case FlowType.NONE:
           // Do nothing.
           break;
-        case FlowType.GOOGLE_PLAY: {
-          updateOffered = offerGooglePlayUpdate();
-          break;
-        }
         case FlowType.TELEGRAM_CHANNEL: {
           updateOffered = offerTelegramChannelUpdate();
           break;
@@ -476,10 +323,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
       case FlowType.NONE:
         // Do nothing.
         break;
-      case FlowType.GOOGLE_PLAY: {
-        updateOffered = offerGooglePlayUpdate();
-        break;
-      }
       case FlowType.TELEGRAM_CHANNEL: {
         // TODO add tdlib reference & show progress
         telegramChannelTdlib.files().downloadFile(telegramChannelFile.document.document);
@@ -507,11 +350,6 @@ public class AppUpdater implements InstallStateUpdatedListener, FileUpdateListen
       case FlowType.TELEGRAM_CHANNEL: {
         // TODO guide on how to allow installing APKs
         UI.openFile(new TdlibContext(context, telegramChannelTdlib), telegramChannelFile.document.fileName, new File(telegramChannelFile.document.document.local.path), telegramChannelFile.document.mimeType, 0);
-        break;
-      }
-      case FlowType.GOOGLE_PLAY: {
-        googlePlayUpdateManager.completeUpdate();
-        setState(State.INSTALLING);
         break;
       }
     }

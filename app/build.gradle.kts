@@ -640,8 +640,6 @@ dependencies {
     libs.androidx.media.exoplayer.hls.latest
   )
   postLollipopImplementation(libs.androidx.media.inspector.latest)
-  // Play In-App Updates: https://developer.android.com/reference/com/google/android/play/core/release-notes-in_app_updates
-  implementation(libs.google.play.app.update)
   // The Checker Framework: https://checkerframework.org/CHANGELOG.md
   compileOnly(libs.annotations.checkerframework)
   // OkHttp: https://github.com/square/okhttp/blob/master/CHANGELOG.md

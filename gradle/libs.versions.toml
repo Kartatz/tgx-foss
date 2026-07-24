@@ -15,7 +15,6 @@ androidx-collection = "1.6.0"
 androidx-interpolator = "1.0.0"
 
 google-zxing = "3.5.4"
-google-play-app-update = "2.1.0"
 
 google-services-plugin = "4.5.0"
 
@@ -190,7 +189,6 @@ google-firebase-messaging-lollipop = { module = "com.google.firebase:firebase-me
 google-firebase-messaging-latest = { module = "com.google.firebase:firebase-messaging", version.ref = "firebase-messaging-latest" }
 
 google-zxing-core = { module = "com.google.zxing:core", version.ref = "google-zxing" }
-google-play-app-update = { module = "com.google.android.play:app-update", version.ref = "google-play-app-update" }
 
 google-play-services-base-legacy = { module = "com.google.android.gms:play-services-base", version.ref = "google-play-services-base-legacy" }
 google-play-services-base-lollipop = { module = "com.google.android.gms:play-services-base", version.ref = "google-play-services-base-lollipop" }

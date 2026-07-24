@@ -2382,10 +2382,6 @@ public abstract class BaseActivity extends FragmentActivity implements View.OnTo
   protected void onActivityResult (int requestCode, int resultCode, Intent data) {
     // TODO rework to registerForActivityResult
     super.onActivityResult(requestCode, resultCode, data);
-    if (requestCode == Intents.ACTIVITY_RESULT_GOOGLE_PLAY_UPDATE) {
-      appUpdater.onGooglePlayFlowActivityResult(resultCode, data);
-      return;
-    }
     final int handlerIndex = activityResultHandlers.indexOfKey(requestCode);
     if (handlerIndex >= 0) {
       ActivityResultHandler handler = activityResultHandlers.valueAt(handlerIndex);
