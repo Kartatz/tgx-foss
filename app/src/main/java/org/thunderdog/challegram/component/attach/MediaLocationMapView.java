@@ -1,16 +1,23 @@
 /*
  * This file is a part of Telegram X
- * Copyright © 2014 (tgx-android@pm.me)
+ * Copyright (c) 2014 (tgx-android@pm.me)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  * File created on 21/10/2016
+ *
+ * FOSS adaptation: Google Maps replaced with OSMDroid (org.osmdroid:osmdroid-android).
  */
 package org.thunderdog.challegram.component.attach;
 
@@ -30,13 +37,14 @@ import android.widget.ImageView;
 
 import androidx.annotation.Nullable;
 
-import com.google.android.gms.maps.CameraUpdate;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.LatLng;
-
+import org.osmdroid.api.IGeoPoint;
+import org.osmdroid.api.IMapController;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider;
+import org.osmdroid.views.overlay.mylocation.IMyLocationProvider;
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 import org.thunderdog.challegram.BaseActivity;
 import org.thunderdog.challegram.Log;
 import org.thunderdog.challegram.R;
@@ -58,7 +66,7 @@ import me.vkryl.android.AnimatorUtils;
 import me.vkryl.android.widget.FrameLayoutFix;
 import me.vkryl.core.lambda.CancellableRunnable;
 
-public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCallback, GoogleMap.OnMyLocationChangeListener, GoogleMap.OnCameraMoveListener, GoogleMap.OnCameraMoveStartedListener, GoogleMap.OnCameraIdleListener, GoogleMap.OnCameraMoveCanceledListener, View.OnClickListener, ActivityPermissionResult {
+public class MediaLocationMapView extends FrameLayoutFix implements View.OnClickListener, ActivityPermissionResult {
   public interface Callback {
     void onLocationUpdate (Location location, boolean custom, boolean gpsLocated, boolean preventRequest, boolean isSmallZoom);
     void onForcedLocationReset ();
@@ -87,7 +95,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
   private ImageView pinXView;
   private CircleButton myLocationButton;
 
-  private @Nullable GoogleMap googleMap;
+  private @Nullable MyLocationNewOverlay myLocationOverlay;
 
   public static int getMapHeight (boolean big) {
     int defaultSize = Screen.dp(150f);
@@ -130,6 +138,9 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       }
     };
     mapView.setLayoutParams(params);
+    mapView.setMultiTouchControls(true);
+    mapView.setBuiltInZoomControls(false);
+    mapView.setTileSource(TileSourceFactory.MAPNIK);
     addView(mapView);
 
     pinXView = new ImageView(getContext());
@@ -191,16 +202,10 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     themeProvider.addThemeBackgroundColorListener(this, ColorId.placeholder);
     setLayoutParams(FrameLayoutFix.newParams(ViewGroup.LayoutParams.MATCH_PARENT, mapHeight, Gravity.TOP));
 
-    // Google Maps initialization
+    // OSMDroid MapView is ready immediately (no Google Play Services readiness dance).
+    // Defer initialization one tick so the host view is attached/ measured first.
 
-    Background.instance().post(() -> {
-      try {
-        mapView.onCreate(null);
-      } catch (Throwable ignored) {
-        // initialized google shit
-      }
-      UI.post(() -> initMap());
-    });
+    Background.instance().post(() -> UI.post(this::initMap));
   }
 
   @Override
@@ -244,36 +249,39 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
 
   private void onMapTouchDown () {
     getParent().getParent().requestDisallowInterceptTouchEvent(true);
-    if (googleMap != null) {
-      LatLng latLng = googleMap.getCameraPosition().target;
-      touchLatitude = latLng.latitude;
-      touchLongitude = latLng.longitude;
+    if (mapView != null) {
+      IGeoPoint c = mapView.getMapCenter();
+      touchLatitude = c.getLatitude();
+      touchLongitude = c.getLongitude();
     }
   }
 
   private void onMapTouchMove () {
     if (!userMovingLocation) {
-      if (googleMap == null) {
+      if (mapView == null) {
         return;
       }
-      LatLng latLng = googleMap.getCameraPosition().target;
-      if (latLng.latitude == touchLatitude && latLng.longitude == touchLongitude) {
+      IGeoPoint c = mapView.getMapCenter();
+      if (c.getLatitude() == touchLatitude && c.getLongitude() == touchLongitude) {
         return;
       }
       setUserMovingLocation(true);
       setIgnoreMyLocation(true);
+      currentLocation = new Location("network");
+      currentLocation.setLatitude(c.getLatitude());
+      currentLocation.setLongitude(c.getLongitude());
+      setShowMyLocationButton(true);
+      if (callback != null) {
+        callback.onLocationUpdate(currentLocation, true, lastMyLocation != null, userMovingLocation || userForcedLocation, isSmallZoom(currentZoom()));
+      }
     }
   }
-
-  private boolean cameraMoving;
 
   private void onMapTouchUp () {
     saveLastLocation();
     getParent().getParent().requestDisallowInterceptTouchEvent(false);
     if (userMovingLocation) {
-      if (!cameraMoving) {
-        setUserMovingLocation(false);
-      }
+      setUserMovingLocation(false);
     }
   }
 
@@ -371,9 +379,13 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     if ((flags & FLAG_DESTROYED) == 0) {
       flags |= FLAG_DESTROYED;
       try {
-        mapView.onDestroy();
+        if (myLocationOverlay != null) {
+          myLocationOverlay.disableMyLocation();
+        }
       } catch (Throwable ignored) { }
-
+      try {
+        mapView.onPause();
+      } catch (Throwable ignored) { }
     }
   }
 
@@ -389,41 +401,18 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     }
     flags |= FLAG_CREATED;
     try {
-      mapView.onCreate(null);
-      mapView.getMapAsync(this);
-    } catch (Throwable ignored) { }
-  }
-
-  // Callbacks
-
-  private boolean checkLocationPermission () {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      return getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+      setupMap();
+    } catch (Throwable t) {
+      Log.e("Failed to initialize OSMDroid map", t);
     }
-    return true;
   }
 
-  @Override
-  public void onMapReady (GoogleMap googleMap) {
-    this.googleMap = googleMap;
+  private void setupMap () {
     pinView.setAlpha(1f);
 
-    try {
-      if (checkLocationPermission()) {
-        googleMap.setMyLocationEnabled(true);
-      }
-    } catch (Throwable t) {
-      Log.e("No access to Google Play Services", t);
+    if (checkLocationPermission()) {
+      enableMyLocation();
     }
-
-    googleMap.getUiSettings().setMyLocationButtonEnabled(false);
-    googleMap.getUiSettings().setZoomControlsEnabled(false);
-    googleMap.getUiSettings().setCompassEnabled(false);
-    googleMap.setOnMyLocationChangeListener(this);
-    googleMap.setOnCameraMoveListener(this);
-    googleMap.setOnCameraMoveStartedListener(this);
-    googleMap.setOnCameraIdleListener(this);
-    googleMap.setOnCameraMoveCanceledListener(this);
 
     if (currentLocation == null) {
       Location currentLocation = MediaLocationFinder.instance().getLastKnownLocation();
@@ -432,7 +421,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       } else {
         double latitude = 45.924197260584734;
         double longitude = 6.870443522930145;
-        float zoomLevel = googleMap.getMinZoomLevel();
+        double zoomLevel = mapView.getMinZoomLevel();
         Settings.LastLocation location = Settings.instance().getViewedLocation();
         if (location != null) {
           latitude = location.latitude;
@@ -448,32 +437,63 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     resumeMap();
   }
 
+  // Callbacks
+
+  private boolean checkLocationPermission () {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      return getContext().checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+    return true;
+  }
+
+  private void enableMyLocation () {
+    if (mapView == null) {
+      return;
+    }
+    try {
+      if (myLocationOverlay == null) {
+        myLocationOverlay = new MyLocationNewOverlay(new GpsMyLocationProvider(getContext()), mapView) {
+          @Override
+          public void onLocationChanged (Location location, IMyLocationProvider source) {
+            super.onLocationChanged(location, source);
+            if (location != null) {
+              MediaLocationMapView.this.onMyLocationChange(location);
+            }
+          }
+        };
+        mapView.getOverlays().add(myLocationOverlay);
+        mapView.invalidate();
+      }
+      myLocationOverlay.enableMyLocation();
+    } catch (Throwable ignored) { }
+  }
+
   private void saveLastLocation () {
-    if (googleMap != null) {
-      if (currentLocation == null) {
-        currentLocation = new Location("network");
-        currentLocation.setLatitude(googleMap.getCameraPosition().target.latitude);
-        currentLocation.setLongitude(googleMap.getCameraPosition().target.longitude);
-      }
-      if (currentLocation != null) {
-        Settings.instance().setViewedLocation(currentLocation.getLatitude(), currentLocation.getLongitude(), googleMap.getCameraPosition().zoom);
-      }
+    if (mapView != null && currentLocation != null) {
+      Settings.instance().setViewedLocation(currentLocation.getLatitude(), currentLocation.getLongitude(), currentZoom());
     }
   }
 
-  private float defaultZoomLevel () {
-    return googleMap == null ? -1 : userForcedLocation ? googleMap.getMaxZoomLevel() - 3 : googleMap.getMaxZoomLevel() - 5;
+  private float currentZoom () {
+    return mapView != null ? (float) mapView.getZoomLevelDouble() : 0f;
+  }
+
+  private double defaultZoomLevel () {
+    if (mapView == null) {
+      return -1;
+    }
+    return userForcedLocation ? mapView.getMaxZoomLevel() - 3 : mapView.getMaxZoomLevel() - 5;
   }
 
   private void positionMarker (Location location) {
     positionMarker(location, defaultZoomLevel());
   }
 
-  private boolean isSmallZoom (float zoomLevel) {
-    return googleMap == null || zoomLevel < googleMap.getMaxZoomLevel() - 10;
+  private boolean isSmallZoom (double zoomLevel) {
+    return mapView == null || zoomLevel < mapView.getMaxZoomLevel() - 10;
   }
 
-  private void positionMarker (Location location, float zoomLevel) {
+  private void positionMarker (Location location, double zoomLevel) {
     positionMarkerInternal(location, zoomLevel);
     setShowMyLocationButton(userForcedLocation);
     if (callback != null) {
@@ -576,9 +596,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       return;
     }
 
-    if (googleMap != null) {
-      googleMap.setMyLocationEnabled(true);
-    }
+    enableMyLocation();
 
     locationPointView.setShowProgress(false);
     if (requestedByUser) {
@@ -588,33 +606,37 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
 
   // positioning
 
-  private void positionMarker (double lat, double lng, float zoomLevel) {
+  private void positionMarker (double lat, double lng, double zoomLevel) {
     Location location = new Location("network");
     location.setLatitude(lat);
     location.setLongitude(lng);
     positionMarker(location, zoomLevel);
   }
 
-  private void positionMarkerInternal (Location location, float zoomLevel) {
+  private void positionMarkerInternal (Location location, double zoomLevel) {
     if (location == null) {
       return;
     }
 
     currentLocation = location;
 
-    if (userMovingLocation || googleMap == null) {
+    if (userMovingLocation || mapView == null) {
       return;
     }
 
-    LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+    IMapController controller = mapView.getController();
+    GeoPoint geoPoint = new GeoPoint(location.getLatitude(), location.getLongitude());
 
     if (didFirstMove) {
-      CameraUpdate position = userForcedLocation || !ignoreMyLocation ? CameraUpdateFactory.newLatLngZoom(latLng, zoomLevel) : CameraUpdateFactory.newLatLng(latLng);
-      googleMap.animateCamera(position);
+      if (userForcedLocation || !ignoreMyLocation) {
+        controller.animateTo(geoPoint, zoomLevel, null);
+      } else {
+        controller.animateTo(geoPoint);
+      }
     } else {
       didFirstMove = true;
-      CameraUpdate position = CameraUpdateFactory.newLatLngZoom(latLng, zoomLevel);
-      googleMap.moveCamera(position);
+      controller.setCenter(geoPoint);
+      controller.setZoom(zoomLevel);
     }
   }
 
@@ -646,7 +668,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
         if (ignoreMyLocation) {
           setShowMyLocationButton(true);
           if (callback != null) {
-            callback.onLocationUpdate(currentLocation, true, lastMyLocation != null, userMovingLocation || userForcedLocation, googleMap == null || isSmallZoom(googleMap.getCameraPosition().zoom));
+            callback.onLocationUpdate(currentLocation, true, lastMyLocation != null, userMovingLocation || userForcedLocation, mapView == null || isSmallZoom(currentZoom()));
           }
         }
       }
@@ -677,8 +699,7 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
     }
   }
 
-  @Override
-  public void onMyLocationChange (Location location) {
+  private void onMyLocationChange (Location location) {
     lastMyLocation = location;
     if (location != null) {
       Settings.instance().saveLastKnownLocation(location.getLatitude(), location.getLongitude(), location.getAccuracy());
@@ -687,56 +708,6 @@ public class MediaLocationMapView extends FrameLayoutFix implements OnMapReadyCa
       setShowMyLocationButton(false);
       positionMarker(location);
       saveLastLocation();
-    }
-  }
-
-  @Override
-  public void onCameraMove () {
-    if (userMovingLocation && googleMap != null) {
-      LatLng latLng = googleMap.getCameraPosition().target;
-      Location location = new Location("network");
-      location.setLatitude(latLng.latitude);
-      location.setLongitude(latLng.longitude);
-      currentLocation = location;
-      setShowMyLocationButton(true);
-      if (callback != null) {
-        callback.onLocationUpdate(location, true, lastMyLocation != null, userMovingLocation || userForcedLocation, true);
-      }
-    }
-  }
-
-  private void setCameraMoving (boolean moving) {
-    if (this.cameraMoving != moving) {
-      this.cameraMoving = moving;
-      if (!cameraMoving) {
-        if (userMovingLocation) {
-          setUserMovingLocation(false);
-        } else {
-          saveLastLocation();
-        }
-      }
-    }
-  }
-
-  @Override
-  public void onCameraIdle () {
-    setCameraMoving(false);
-    saveLastLocation();
-  }
-
-  @Override
-  public void onCameraMoveCanceled () {
-    setCameraMoving(false);
-  }
-
-  private boolean ignoredFirstMove;
-
-  @Override
-  public void onCameraMoveStarted (int i) {
-    if (ignoredFirstMove) {
-      setCameraMoving(true);
-    } else {
-      ignoredFirstMove = true;
     }
   }
 }

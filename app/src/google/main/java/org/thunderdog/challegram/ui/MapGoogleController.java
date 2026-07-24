@@ -1,16 +1,23 @@
 /*
  * This file is a part of Telegram X
- * Copyright © 2014 (tgx-android@pm.me)
+ * Copyright (c) 2014 (tgx-android@pm.me)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  * File created on 08/03/2018
+ *
+ * FOSS adaptation: Google Maps replaced with OSMDroid (org.osmdroid:osmdroid-android).
  */
 package org.thunderdog.challegram.ui;
 
@@ -22,26 +29,23 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.location.Location;
+import android.view.MotionEvent;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.google.android.gms.maps.CameraUpdate;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CameraPosition;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.LatLngBounds;
-import com.google.android.gms.maps.model.MapStyleOptions;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
-
+import org.osmdroid.api.IMapController;
+import org.osmdroid.tileprovider.tilesource.ITileSource;
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory;
+import org.osmdroid.util.BoundingBox;
+import org.osmdroid.util.GeoPoint;
+import org.osmdroid.views.MapView;
+import org.osmdroid.views.overlay.Marker;
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay;
 import org.drinkless.tdlib.TdApi;
 import org.thunderdog.challegram.Log;
 import org.thunderdog.challegram.R;
@@ -66,9 +70,9 @@ import java.util.List;
 import me.vkryl.core.lambda.Destroyable;
 import tgx.td.MessageId;
 
-final class MapGoogleController extends MapController<MapView, MapGoogleController.MarkerData> implements OnMapReadyCallback, GoogleMap.OnMyLocationChangeListener, GoogleMap.OnCameraMoveStartedListener, GoogleMap.OnMarkerClickListener {
-  private static final float DEFAULT_ZOOM_LEVEL = 16.0f;
-  private static final float CLICK_ZOOM_LEVEL = 17.0f;
+final class MapGoogleController extends MapController<MapView, MapGoogleController.MarkerData> {
+  private static final double DEFAULT_ZOOM_LEVEL = 16.0;
+  private static final double CLICK_ZOOM_LEVEL = 17.0;
 
   public MapGoogleController (Context context, Tdlib tdlib) {
     super(context, tdlib);
@@ -76,33 +80,64 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
 
   @Override
   protected MapView createMapView (Context context, int marginBottom) {
-    MapView mapView = new MapView(context);
+    MapView mapView = new MapView(context) {
+      private double downLat, downLng;
+      @Override
+      public boolean onTouchEvent (MotionEvent ev) {
+        switch (ev.getAction()) {
+          case MotionEvent.ACTION_DOWN: {
+            downLat = getMapCenter().getLatitude();
+            downLng = getMapCenter().getLongitude();
+            break;
+          }
+          case MotionEvent.ACTION_UP: {
+            if (getMapCenter().getLatitude() != downLat || getMapCenter().getLongitude() != downLng) {
+              onUserMovedCamera();
+            }
+            break;
+          }
+        }
+        return super.onTouchEvent(ev);
+      }
+    };
     mapView.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     mapView.setPadding(0, 0, 0, marginBottom);
+    mapView.setMultiTouchControls(true);
+    mapView.setBuiltInZoomControls(false);
     return mapView;
   }
 
   private static final float FINISHED_BROADCAST_ALPHA = .6f;
 
-  public static class MarkerData implements Watcher, Destroyable {
+  public class MarkerData implements Watcher, Destroyable {
     public final Tdlib tdlib;
-    public Marker marker;
+    private final MapView mapView;
+    public final Marker marker;
 
     private final WatcherReference reference = new WatcherReference(this);
 
     public Canvas canvas;
     public Bitmap bitmap;
 
-    public MarkerData (Tdlib tdlib, GoogleMap googleMap, LocationPoint<MarkerData> point) {
+    public MarkerData (Tdlib tdlib, MapView mapView, LocationPoint<MarkerData> point) {
       this.tdlib = tdlib;
-      marker = googleMap.addMarker(newPoint(point));
-      marker.setTag(point);
+      this.mapView = mapView;
+      marker = new Marker(mapView);
+      marker.setRelatedObject(point);
+      marker.setAnchor(0.5f, 0.907f);
+      marker.setOnMarkerClickListener((m, mv) -> {
+        Object tag = m.getRelatedObject();
+        if (tag instanceof LocationPoint) {
+          onMarkerClick((LocationPoint<MarkerData>) tag);
+        }
+        return true;
+      });
+      applyPoint(point);
+      mapView.getOverlays().add(marker);
     }
 
-    private MarkerOptions newPoint (LocationPoint<MarkerData> point) {
-      LatLng latLng = new LatLng(point.latitude, point.longitude);
-      MarkerOptions opts = new MarkerOptions();
-      opts.position(latLng);
+    private void applyPoint (LocationPoint<MarkerData> point) {
+      marker.setPosition(new GeoPoint(point.latitude, point.longitude));
       Bitmap bitmap = null;
       if (point.isSelfLocation) {
         TdApi.User user = tdlib.myUser();
@@ -111,16 +146,13 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
         TdApi.File avatar = user != null && user.profilePhoto != null ? user.profilePhoto.small : null;
         bitmap = newBitmap(this, accentColor, letters, avatar);
       } else if (point.isLiveLocation && point.message != null) {
-        opts.zIndex(1f);
         this.isActive = ((TdApi.MessageLiveLocation) point.message.content).expiresIn > 0;
-        opts.alpha(isActive ? 1f : FINISHED_BROADCAST_ALPHA);
+        marker.setAlpha(isActive ? 1f : FINISHED_BROADCAST_ALPHA);
         bitmap = newBitmap(this, point.message);
       }
       if (bitmap != null) {
-        opts.icon(BitmapDescriptorFactory.fromBitmap(bitmap));
-        opts.anchor(0.5f, 0.907f);
+        marker.setIcon(new BitmapDrawable(UI.getResources(), bitmap));
       }
-      return opts;
     }
 
     private @Nullable Bitmap newBitmap (MarkerData data, TdApi.Message message) {
@@ -224,7 +256,7 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     }
 
     public void setPosition (LocationPoint<MarkerData> point) {
-      marker.setPosition(new LatLng(point.latitude, point.longitude));
+      marker.setPosition(new GeoPoint(point.latitude, point.longitude));
       setActive(point.message == null || ((TdApi.MessageLiveLocation) point.message.content).expiresIn > 0);
     }
 
@@ -238,7 +270,8 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     }
 
     public void remove () {
-      marker.remove();
+      marker.closeInfoWindow();
+      mapView.getOverlays().remove(marker);
     }
 
     @Override
@@ -274,7 +307,8 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
         drawAvatar(canvas, bitmap);
         UI.post(() -> {
           if (isRequested(file)) {
-            marker.setIcon(BitmapDescriptorFactory.fromBitmap(this.bitmap));
+            marker.setIcon(new BitmapDrawable(UI.getResources(), this.bitmap));
+            mapView.invalidate();
           }
         });
       }
@@ -284,18 +318,100 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     public void imageProgress (ImageFile file, float progress) { }
   }
 
-  @Override
-  protected boolean needBackgroundMapInitialization (@NonNull MapView mapView) {
-    return true;
+  private void onMarkerClick (LocationPoint<MarkerData> point) {
+    long chatId = 0;
+    long messageId = 0;
+    if (point.message != null) {
+      chatId = point.message.chatId;
+      messageId = point.message.id;
+    } else if (point.isSelfLocation) {
+      chatId = getArgumentsStrict().chatId;
+      TdApi.Message outputMessage = tdlib.cache().findOutputLiveLocationMessage(chatId);
+      if (outputMessage != null) {
+        messageId = outputMessage.id;
+      }
+    }
+    if (chatId != 0 && messageId != 0) {
+      tdlib.ui().openChat(this, chatId, new TdlibUi.ChatOpenParameters().highlightMessage(new MessageId(chatId, messageId)).ensureHighlightAvailable());
+    }
   }
 
   @Override
+  protected boolean needBackgroundMapInitialization (@NonNull MapView mapView) {
+    return false;
+  }
+
+  private boolean mapInitialized;
+  private MyLocationNewOverlay myLocationOverlay;
+
+  @Override
   protected void initializeMap (@NonNull MapView mapView, boolean inBackground) {
+    if (mapInitialized) {
+      return;
+    }
+    mapInitialized = true;
     try {
-      mapView.onCreate(null);
-      if (!inBackground) {
-        mapView.getMapAsync(this);
+      applyMapType(mapType(), mapView);
+
+      List<LocationPoint<MarkerData>> points = pointsOfInterest();
+      for (LocationPoint<MarkerData> point : points) {
+        if (point.data != null) {
+          point.data.setPosition(point);
+        } else {
+          point.data = new MarkerData(tdlib, mapView, point);
+        }
       }
+      boolean isSharing = isSharingLiveLocation();
+      if (isSharing) {
+        LocationPoint<MarkerData> point = myLocation(false);
+        if (point != null) {
+          if (point.data != null) {
+            point.data.setPosition(point);
+          } else {
+            point.data = new MarkerData(tdlib, mapView, point);
+          }
+        }
+      }
+      moveCameraToInitial(mapView, getArgumentsStrict().mode == MODE_DROPPED_PIN);
+      mapView.onResume();
+      executeScheduledAnimation();
+    } catch (Throwable t) {
+      Log.w(t);
+    }
+  }
+
+  private void zoomToBoundsSafe (@NonNull final MapView mapView, final BoundingBox bounds, final boolean animated, final int border) {
+    if (mapView.getWidth() != 0 && mapView.getHeight() != 0) {
+      try {
+        mapView.zoomToBoundingBox(bounds, animated, border);
+      } catch (Throwable ignored) { }
+      return;
+    }
+    mapView.addOnFirstLayoutListener((v, left, top, right, bottom) -> {
+      try {
+        mapView.zoomToBoundingBox(bounds, animated, border);
+      } catch (Throwable ignored) { }
+    });
+  }
+
+  private void applyMapType (int mapType, @NonNull MapView mapView) {
+    ITileSource tileSource;
+    switch (mapType) {
+      case Settings.MAP_TYPE_TERRAIN:
+        tileSource = TileSourceFactory.USGS_TOPO;
+        break;
+      case Settings.MAP_TYPE_SATELLITE:
+      case Settings.MAP_TYPE_HYBRID:
+        tileSource = TileSourceFactory.USGS_SAT;
+        break;
+      case Settings.MAP_TYPE_DARK:
+      case Settings.MAP_TYPE_DEFAULT:
+      default:
+        tileSource = TileSourceFactory.MAPNIK;
+        break;
+    }
+    try {
+      mapView.setTileSource(tileSource);
     } catch (Throwable ignored) { }
   }
 
@@ -312,7 +428,10 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
   @Override
   protected void destroyMap (@NonNull MapView mapView) {
     try { mapView.onPause(); } catch (Throwable ignored) { }
-    try { mapView.onDestroy(); } catch (Throwable ignored) { }
+    if (myLocationOverlay != null) {
+      try { myLocationOverlay.disableMyLocation(); } catch (Throwable ignored) { }
+      myLocationOverlay = null;
+    }
   }
 
   @Override
@@ -323,127 +442,42 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
   @SuppressWarnings("MissingPermission")
   @Override
   protected boolean displayMyLocation (@NonNull MapView mapView) {
-    if (googleMap != null) {
-      try {
-        googleMap.setMyLocationEnabled(true);
+    try {
+      if (myLocationOverlay == null) {
+        myLocationOverlay = new MyLocationNewOverlay(mapView);
+        mapView.getOverlays().add(myLocationOverlay);
+      }
+      if (context.permissions().canAccessLocation()) {
+        myLocationOverlay.enableMyLocation();
         return true;
-      } catch (Throwable ignored) { }
-    }
+      }
+    } catch (Throwable ignored) { }
     return false;
-  }
-
-  private GoogleMap googleMap;
-
-  private MapStyleOptions darkMapTheme;
-  private MapStyleOptions getDarkMapTheme () {
-    if (darkMapTheme == null) {
-      darkMapTheme = MapStyleOptions.loadRawResourceStyle(context, R.raw.maps_night);
-    }
-    return darkMapTheme;
   }
 
   @Override
   protected void onApplyMapType (int oldType, int newType) {
-    if (googleMap != null) {
-      if (oldType == Settings.MAP_TYPE_DARK) {
-        try { googleMap.setMapStyle(null); } catch (Throwable ignored) { }
-      } else if (newType == Settings.MAP_TYPE_DARK) {
-        try { googleMap.setMapStyle(getDarkMapTheme()); } catch (Throwable ignored) { }
-      }
-      switch (newType) {
-        case Settings.MAP_TYPE_DEFAULT:
-          googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-          break;
-        case Settings.MAP_TYPE_DARK:
-          googleMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-          break;
-        case Settings.MAP_TYPE_TERRAIN:
-          googleMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
-          break;
-        case Settings.MAP_TYPE_HYBRID:
-        case Settings.MAP_TYPE_SATELLITE:
-          googleMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-          break;
-      }
+    MapView view = mapView();
+    if (view != null) {
+      applyMapType(newType, view);
     }
-  }
-
-  @Override
-  public void onMapReady (GoogleMap googleMap) {
-    if (isDestroyed()) {
-      return;
-    }
-
-    this.googleMap = googleMap;
-
-    googleMap.getUiSettings().setMyLocationButtonEnabled(false);
-    googleMap.getUiSettings().setZoomControlsEnabled(false);
-    googleMap.getUiSettings().setCompassEnabled(false);
-    googleMap.setOnMyLocationChangeListener(this);
-    googleMap.setOnMarkerClickListener(this);
-
-    googleMap.setOnCameraMoveStartedListener(this);
-
-    if (context.permissions().canAccessLocation()) {
-      try { googleMap.setMyLocationEnabled(true); } catch (Throwable ignored) { }
-    }
-
-    switch (mapType()) {
-      case Settings.MAP_TYPE_DEFAULT:
-        break;
-      case Settings.MAP_TYPE_DARK:
-        try { googleMap.setMapStyle(getDarkMapTheme()); } catch (Throwable ignored) { }
-        break;
-      case Settings.MAP_TYPE_TERRAIN:
-        googleMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
-        break;
-      case Settings.MAP_TYPE_SATELLITE:
-      case Settings.MAP_TYPE_HYBRID:
-        googleMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-        break;
-    }
-
-    List<LocationPoint<MarkerData>> points = pointsOfInterest();
-    for (LocationPoint<MarkerData> point : points) {
-      if (point.data != null) {
-        point.data.setPosition(point);
-      } else {
-        point.data = new MarkerData(tdlib, googleMap, point);
-      }
-    }
-    boolean isSharing = isSharingLiveLocation();
-    if (isSharing) {
-      LocationPoint<MarkerData> point = myLocation(false);
-      if (point != null) {
-        if (point.data != null) {
-          point.data.setPosition(point);
-        } else {
-          point.data = new MarkerData(tdlib, googleMap, point);
-        }
-      }
-    }
-    googleMap.moveCamera(buildCamera(mapView(), null, false, getArgumentsStrict().mode == MODE_DROPPED_PIN));
-
-    mapView().onResume();
-
-    executeScheduledAnimation();
   }
 
   @Override
   protected void onPointOfInterestFocusStateChanged (LocationPoint<MarkerData> point, boolean isFocused) {
-    if (point.data != null) {
-      point.data.marker.setZIndex(isFocused ? 10f : point.isLiveLocation && point.message != null ? 1f : 0f);
-    }
+    // OSMDroid markers do not expose z-ordering; focus state has no visual side effect here.
   }
 
   @Override
   protected void onPointOfInterestAdded (LocationPoint<MarkerData> point, int toIndex) {
-    if (googleMap != null) {
+    MapView view = mapView();
+    if (view != null) {
       if (point.data != null) {
         point.data.setPosition(point);
       } else {
-        point.data = new MarkerData(tdlib, googleMap, point);
+        point.data = new MarkerData(tdlib, view, point);
       }
+      view.invalidate();
     }
   }
 
@@ -452,6 +486,10 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     if (point.data != null) {
       point.data.remove();
       point.data = null;
+    }
+    MapView view = mapView();
+    if (view != null) {
+      view.invalidate();
     }
   }
 
@@ -469,151 +507,122 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     }
   }
 
-  private CameraUpdate buildCamera (MapView mapView, @Nullable LocationPoint<MarkerData> specificPoint, boolean needBearing, boolean onlyFocus) {
-    LocationPoint<MarkerData> singlePoint = specificPoint;
+  private Double singlePointZoom (@Nullable LocationPoint<MarkerData> specificPoint) {
+    MapView view = mapView();
+    if (specificPoint != null && view != null) {
+      double current = view.getZoomLevelDouble();
+      return Math.max(current, CLICK_ZOOM_LEVEL);
+    }
+    return DEFAULT_ZOOM_LEVEL;
+  }
+
+  private void moveCameraToInitial (@NonNull MapView mapView, boolean onlyFocus) {
+    LocationPoint<MarkerData> singlePoint = null;
     List<LocationPoint<MarkerData>> pointOfInterests = pointsOfInterest();
-    LocationPoint<MarkerData> myLocation = myLocation(true);
+    LocationPoint<MarkerData> myLoc = myLocation(true);
 
-    if (singlePoint == null) {
-      int totalCount = pointOfInterests.size();
-      if (myLocation != null) {
-        totalCount++;
-      }
-      if (totalCount == 1) {
-        singlePoint = myLocation != null ? myLocation : pointOfInterests.get(0);
-      }
-    }
-
-    if (singlePoint != null) {
-      CameraPosition.Builder b = new CameraPosition.Builder();
-      b.target(new LatLng(singlePoint.latitude, singlePoint.longitude));
-      float zoom = DEFAULT_ZOOM_LEVEL;
-      if (specificPoint != null) {
-        zoom = Math.max(googleMap.getCameraPosition().zoom, CLICK_ZOOM_LEVEL);
-      }
-      b.zoom(zoom);
-      if (needBearing) {
-        b.bearing(singlePoint.bearing);
-        b.tilt(45f);
-      }
-      return CameraUpdateFactory.newCameraPosition(b.build());
-    }
-
-    LatLngBounds.Builder b = new LatLngBounds.Builder();
-    if (myLocation != null) {
-      b.include(new LatLng(myLocation.latitude, myLocation.longitude));
-    }
-    if (onlyFocus) {
-      if (hasFocusPoint()) {
-        LocationPoint<MarkerData> point = pointOfInterests.get(0);
-        b.include(new LatLng(point.latitude, point.longitude));
+    if (myLoc == null) {
+      if (pointOfInterests.size() == 1) {
+        singlePoint = pointOfInterests.get(0);
       }
     } else {
-      for (LocationPoint<MarkerData> point : pointOfInterests) {
-        b.include(new LatLng(point.latitude, point.longitude));
+      if (pointOfInterests.isEmpty()) {
+        singlePoint = myLoc;
       }
     }
 
-    LatLngBounds tmpBounds = b.build();
-    LatLng center = tmpBounds.getCenter();
-    int bound = 111;
-    LatLng northEast = move(center, bound, bound);
-    LatLng southWest = move(center, -bound, -bound);
-    b.include(southWest);
-    b.include(northEast);
-
-    LatLngBounds bounds = b.build();
-
-    int mapWidth = mapView.getMeasuredWidth();
-    int mapHeight = mapView.getMeasuredHeight();
-
-    if (mapWidth == 0 || mapHeight == 0) {
-      mapWidth = context.getContentView().getMeasuredWidth();
-      mapHeight = context.getContentView().getMeasuredHeight();
+    IMapController controller = mapView.getController();
+    if (singlePoint != null) {
+      controller.setCenter(new GeoPoint(singlePoint.latitude, singlePoint.longitude));
+      controller.setZoom(DEFAULT_ZOOM_LEVEL);
+      return;
     }
 
-    if (mapWidth == 0 || mapHeight == 0) {
-      mapWidth = Screen.currentWidth();
-      mapHeight = Screen.currentHeight();
+    BoundingBox bounds = buildBounds(myLoc, pointOfInterests, onlyFocus);
+    if (bounds != null) {
+      zoomToBoundsSafe(mapView, bounds, false, Screen.dp(82f));
+    } else if (myLoc != null) {
+      controller.setCenter(new GeoPoint(myLoc.latitude, myLoc.longitude));
+      controller.setZoom(DEFAULT_ZOOM_LEVEL);
     }
+  }
 
-    return CameraUpdateFactory.newLatLngBounds(bounds, mapWidth, mapHeight, Screen.dp(82f));
+  private @Nullable BoundingBox buildBounds (@Nullable LocationPoint<MarkerData> myLoc, @NonNull List<LocationPoint<MarkerData>> points, boolean onlyFocus) {
+    if (myLoc == null && points.isEmpty()) {
+      return null;
+    }
+    double minLat = Double.POSITIVE_INFINITY, maxLat = Double.NEGATIVE_INFINITY;
+    double minLng = Double.POSITIVE_INFINITY, maxLng = Double.NEGATIVE_INFINITY;
+    if (myLoc != null) {
+      minLat = Math.min(minLat, myLoc.latitude);
+      maxLat = Math.max(maxLat, myLoc.latitude);
+      minLng = Math.min(minLng, myLoc.longitude);
+      maxLng = Math.max(maxLng, myLoc.longitude);
+    }
+    if (onlyFocus) {
+      if (hasFocusPoint() && !points.isEmpty()) {
+        LocationPoint<MarkerData> p = points.get(0);
+        minLat = Math.min(minLat, p.latitude);
+        maxLat = Math.max(maxLat, p.latitude);
+        minLng = Math.min(minLng, p.longitude);
+        maxLng = Math.max(maxLng, p.longitude);
+      }
+    } else {
+      for (LocationPoint<MarkerData> p : points) {
+        minLat = Math.min(minLat, p.latitude);
+        maxLat = Math.max(maxLat, p.latitude);
+        minLng = Math.min(minLng, p.longitude);
+        maxLng = Math.max(maxLng, p.longitude);
+      }
+    }
+    if (minLat == Double.POSITIVE_INFINITY) {
+      return null;
+    }
+    // Pad bounds a touch so a single point still has breathing room.
+    double padLat = meterToLatitude(Screen.dp(111));
+    double padLng = meterToLongitude(Screen.dp(111), (minLat + maxLat) / 2);
+    return new BoundingBox(maxLat + padLat, maxLng + padLng, minLat - padLat, minLng - padLng);
   }
 
   private static final double EARTH_RADIUS = 6366198;
-  /**
-   * Create a new LatLng which lies toNorth meters north and toEast meters
-   * east of startLL
-   */
-  private static LatLng move(LatLng startLL, double toNorth, double toEast) {
-    double lonDiff = meterToLongitude(toEast, startLL.latitude);
-    double latDiff = meterToLatitude(toNorth);
-    return new LatLng(startLL.latitude + latDiff, startLL.longitude
-      + lonDiff);
-  }
 
-  private static double meterToLongitude(double meterToEast, double latitude) {
+  private static double meterToLongitude (double meterToEast, double latitude) {
     double latArc = Math.toRadians(latitude);
     double radius = Math.cos(latArc) * EARTH_RADIUS;
     double rad = meterToEast / radius;
     return Math.toDegrees(rad);
   }
 
-
-  private static double meterToLatitude(double meterToNorth) {
+  private static double meterToLatitude (double meterToNorth) {
     double rad = meterToNorth / EARTH_RADIUS;
     return Math.toDegrees(rad);
   }
 
   @Override
   protected boolean onPositionRequested (@NonNull MapView mapView, @Nullable LocationPoint<MarkerData> point, boolean animated, boolean needBearing, boolean onlyFocus) {
-    if (googleMap != null) {
-      CameraUpdate cameraUpdate = buildCamera(mapView, point, needBearing, onlyFocus);
+    IMapController controller = mapView.getController();
+    if (point != null) {
+      GeoPoint target = new GeoPoint(point.latitude, point.longitude);
+      double zoom = singlePointZoom(point);
+      if (needBearing) {
+        try { mapView.setMapOrientation(point.bearing); } catch (Throwable ignored) { }
+      }
       if (animated) {
-        googleMap.animateCamera(cameraUpdate);
+        controller.animateTo(target, zoom, null);
         return true;
       } else {
-        googleMap.moveCamera(cameraUpdate);
+        controller.setCenter(target);
+        controller.setZoom(zoom);
+        return false;
       }
+    }
+
+    BoundingBox bounds = buildBounds(myLocation(true), pointsOfInterest(), onlyFocus);
+    if (bounds != null) {
+      zoomToBoundsSafe(mapView, bounds, animated, Screen.dp(82f));
+      return animated;
     }
     return false;
-  }
-
-  @Override
-  public void onMyLocationChange (Location location) {
-    Settings.instance().saveLastKnownLocation(location.getLatitude(), location.getLongitude(), location.getAccuracy());
-    setMyLocation(location);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public boolean onMarkerClick (Marker marker) {
-    LocationPoint<MarkerData> point = (LocationPoint<MarkerData>) marker.getTag();
-    if (point != null) {
-      long chatId = 0;
-      long messageId = 0;
-      if (point.message != null) {
-        chatId = point.message.chatId;
-        messageId = point.message.id;
-      } else if (point.isSelfLocation) {
-        chatId = getArgumentsStrict().chatId;
-        TdApi.Message outputMessage = tdlib.cache().findOutputLiveLocationMessage(chatId);
-        if (outputMessage != null) {
-          messageId = outputMessage.id;
-        }
-      }
-      if (chatId != 0 && messageId != 0) {
-        tdlib.ui().openChat(this, chatId, new TdlibUi.ChatOpenParameters().highlightMessage(new MessageId(chatId, messageId)).ensureHighlightAvailable());
-      }
-    }
-    return true;
-  }
-
-  @Override
-  public void onCameraMoveStarted (int reason) {
-    if (reason == REASON_GESTURE) {
-      onUserMovedCamera();
-    }
   }
 
   @Override
@@ -636,50 +645,12 @@ final class MapGoogleController extends MapController<MapView, MapGoogleControll
     };
   }
 
-  /*private boolean hasBearing;
-  private float bearing;
-  private FusedLocationProviderClient bearingClient;
-  private LocationCallback bearingCallback;*/
-
   @Override
   protected boolean onStartPeriodicBearingUpdates (@NonNull MapView mapView) {
     return false;
-    /*if (!U.checkLocationPermission(context)) {
-    }
-    if (bearingCallback == null) {
-      bearingCallback = new com.google.android.gms.location.LocationCallback() {
-        @Override
-        public void onLocationResult (LocationResult locationResult) {
-          super.onLocationResult(locationResult);
-          Location location = locationResult.getLastLocation();
-          hasBearing = true;
-          bearing = location.getBearing();
-          location.
-          setMyLocation(location);
-        }
-      };
-    }
-    LocationRequest request = LocationRequest.create()
-      .setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY)
-      .setInterval(2000)
-      .setFastestInterval(500);
-    bearingClient = LocationServices.getFusedLocationProviderClient((Context) context);
-    try {
-      bearingClient.requestLocationUpdates(request, bearingCallback, Looper.getMainLooper());
-      return true;
-    } catch (Throwable ignored) {
-      bearingClient = null;
-    }
-    return false;*/
   }
 
   @Override
   protected void onFinishPeriodicBearingUpdates (@NonNull MapView mapView) {
-    /*if (bearingClient != null) {
-      try { bearingClient.removeLocationUpdates(bearingCallback); } catch (Throwable ignored) { }
-      bearingClient = null;
-    }
-    hasBearing = false;
-    bearing = 0f;*/
   }
 }

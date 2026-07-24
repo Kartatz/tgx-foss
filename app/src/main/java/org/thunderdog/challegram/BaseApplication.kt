@@ -19,6 +19,7 @@ import androidx.work.Configuration
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
+import org.osmdroid.config.Configuration as OsmConfiguration
 import org.thunderdog.challegram.push.FirebaseDeviceTokenRetriever
 import org.thunderdog.challegram.service.PushHandler
 import org.thunderdog.challegram.telegram.TdlibNotificationUtils
@@ -38,6 +39,8 @@ class BaseApplication : TgxApplication(), Configuration.Provider {
   override fun onCreate() {
     super.onCreate()
     scope = MainScope()
+
+    OsmConfiguration.getInstance().userAgentValue = packageName
 
     PushManagerBridge.initialize(
       scope,

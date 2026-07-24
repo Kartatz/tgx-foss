@@ -584,17 +584,7 @@ dependencies {
     libs.google.play.services.basement.lollipop,
     libs.google.play.services.basement.latest
   )
-  flavorImplementation(
-    libs.google.play.services.maps.legacy,
-    libs.google.play.services.maps.lollipop,
-    libs.google.play.services.maps.latest
-  )
-   flavorImplementation(
-     libs.google.play.services.location.legacy,
-     libs.google.play.services.location.lollipop,
-     libs.google.play.services.location.latest
-   )
-   // Firebase: https://firebase.google.com/support/release-notes/android
+    // Firebase: https://firebase.google.com/support/release-notes/android
   flavorImplementation(
     libs.google.firebase.messaging.legacy,
     libs.google.firebase.messaging.lollipop,
@@ -646,6 +636,9 @@ dependencies {
   preMarshmallowImplementation(libs.relinker)
   // Konfetti: https://github.com/DanielMartinus/Konfetti/blob/main/README.md
   implementation(libs.konfetti)
+
+  // OSMDroid: https://github.com/osmdroid/osmdroid
+  implementation(libs.osmdroid)
   // https://github.com/mikereedell/sunrisesunsetlib-java
   implementation(libs.sunriseSunsetCalculator)
 

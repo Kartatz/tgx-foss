@@ -83,3 +83,7 @@
 -dontwarn org.openjsse.net.ssl.OpenJSSE
 
 -dontwarn com.google.firebase.analytics.connector.AnalyticsConnector
+
+# OSMDroid: https://github.com/osmdroid/osmdroid
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**
