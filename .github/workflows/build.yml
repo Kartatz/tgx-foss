@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          submodules: true
+          submodules: recursive
       - name: Set swap space
         uses: pierotofy/set-swap-space@master
         with:
