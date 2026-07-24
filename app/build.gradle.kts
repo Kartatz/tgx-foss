@@ -594,16 +594,7 @@ dependencies {
      libs.google.play.services.location.lollipop,
      libs.google.play.services.location.latest
    )
-   // ML Kit: https://developers.google.com/ml-kit/release-notes
-  flavorImplementation(
-    libs.google.play.services.mlkit.barcode.scanning.legacy,
-    libs.google.play.services.mlkit.barcode.scanning.latest
-  )
-  flavorImplementation(
-    libs.google.mlkit.language.id.legacy,
-    libs.google.mlkit.language.id.latest
-  )
-  // Firebase: https://firebase.google.com/support/release-notes/android
+   // Firebase: https://firebase.google.com/support/release-notes/android
   flavorImplementation(
     libs.google.firebase.messaging.legacy,
     libs.google.firebase.messaging.lollipop,

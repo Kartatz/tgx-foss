@@ -57,9 +57,6 @@ firebase-messaging-latest = "25.1.1"
 google-play-services-base-latest = "18.10.0"
 google-play-services-maps-latest = "20.0.0"
 google-play-services-location-latest = "21.4.0"
-google-play-services-mlkit-barcode-scanning-latest = "18.3.1"
-
-google-mlkit-language-id-latest = "17.0.6"
 
 # marshmallow
 
@@ -99,9 +96,6 @@ firebase-messaging-legacy = "22.0.0" # 23.0.0+ requires minSdk 19
 google-play-services-base-legacy = "17.6.0" # 18.0.0+ requires minSdk 21
 google-play-services-maps-legacy = "17.0.1"
 google-play-services-location-legacy = "18.0.0"
-google-play-services-mlkit-barcode-scanning-legacy = "16.2.1" # 18.3.0+ requires minSdk 21, 18.3.1+ requires minSdk 26
-
-google-mlkit-language-id-legacy = "16.1.1"
 
 [libraries]
 desugaring = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugaring" }
@@ -204,12 +198,6 @@ google-play-services-maps-latest = { module = "com.google.android.gms:play-servi
 google-play-services-location-legacy = { module = "com.google.android.gms:play-services-location", version.ref = "google-play-services-location-legacy" }
 google-play-services-location-lollipop = { module = "com.google.android.gms:play-services-location", version.ref = "google-play-services-location-lollipop" }
 google-play-services-location-latest = { module = "com.google.android.gms:play-services-location", version.ref = "google-play-services-location-latest" }
-
-google-play-services-mlkit-barcode-scanning-legacy = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "google-play-services-mlkit-barcode-scanning-legacy" }
-google-play-services-mlkit-barcode-scanning-latest = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "google-play-services-mlkit-barcode-scanning-latest" }
-
-google-mlkit-language-id-legacy = { module = "com.google.mlkit:language-id", version.ref = "google-mlkit-language-id-legacy" }
-google-mlkit-language-id-latest = { module = "com.google.mlkit:language-id", version.ref = "google-mlkit-language-id-latest" }
 
 huawei-agconnect = { module = "com.huawei.agconnect:agcp", version.ref = "huawei-agcp" }
 huawei-hms = { module = "com.huawei.hms:push", version.ref = "huawei-hms" }
