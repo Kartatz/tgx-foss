@@ -46,7 +46,7 @@ jobs:
           echo 'PINO_LTO=full' >> "${GITHUB_ENV}"
           echo 'PINO_OPT_LEVEL=fast' >> "${GITHUB_ENV}"
           echo 'PINO_HOME=/tmp/android-gcc-cross' >> "${GITHUB_ENV}"
-          
+          echo 'INPUT(-lgcc)' | tee "/tmp/android-gcc-cross/libclang_rt.builtins-"{arm,aarch64,i386,x86_64}'-android.a'
           /tmp/android-gcc-cross/bin/ndk-patch
       - name: Build
         run: |
